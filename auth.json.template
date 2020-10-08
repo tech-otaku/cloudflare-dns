@@ -1,0 +1,7 @@
+{
+    "cloudflare": {
+        "email": "your-cloudlare-email",
+        "key": "your-cloudflare-api-key",
+        "token": "your-cloudflare-api-token"
+    }
+}
