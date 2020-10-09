@@ -6,7 +6,7 @@ Add or update your domain's DNS records from the command line using the [Cloudfl
 ## Background
 I initially wrote this script as a quick way of repeatedly adding or updating DNS records for several domains from the command line when I was building and testing my mail server. ***If you're thinking of using it, it's important you read the [Limitations](#limitations) section first*** and check your domain's DNS records on Cloudflare afterwards. 
 
-The script is based upon examples of using the Cloudflare API written some while ago at [Using the Cloudflare API to Manage DNS Records](https://www.tech-otaku.com/web-development/using-cloudflare-api-manage-dns-records/).
+The script is based upon examples of using the Cloudflare API at [Using the Cloudflare API to Manage DNS Records](https://www.tech-otaku.com/web-development/using-cloudflare-api-manage-dns-records/).
 
 ## Usage
 
@@ -20,7 +20,7 @@ Use `./cf-dns.sh -h` to see an explanation of the options and their usage.
 
 In addition, please note the following:
 
-- All but the `-o` and `-k` options are required. This is true even when updating an existing DNS record where not all the data is changing. 
+- All but the `-k` and `-o` options are required. This is true even when updating an existing DNS record where not all the data is changing. 
 
     For example, to change only the content [`-c CONTENT`] for this record to `198.51.100.54` all data needs to be given:
 
@@ -44,7 +44,7 @@ In addition, please note the following:
 
     <br />  
 
-- Proxied status [`-x PROXIED`] is not required for `MX` or `TXT` type DNS records and is ignored if specified as they can not be proxied through Cloudflare.
+- Proxied status [`-x PROXIED`] is not required for `MX` or `TXT` type DNS records and is ignored if specified. These DNS record types can not be proxied through Cloudflare.
 
     <br />  
 
@@ -54,16 +54,16 @@ In addition, please note the following:
 
 - The script checks if the domain name [`-d DOMAIN`] and DNS record name [`-n NAME`] are the same. If not, the domain name is appended to the DNS record name as per the table below (think `dig TXT example.com` and `dig TXT dkim._domainkey.example.com`). The `-o` option overrides this behaviour, but I can't recall why I initially included it. If used, the option is ignored and will be removed at a later date. 
 
-    | TYPE  | NAME                | REFERENCED AS                   |
-    |:------|:--------------------|:--------------------------------|
-    | A     | **example.com**     | example.com                     |
-    | AAAA  | **example.com**     | example.com                     |
-    | A     | **demo**            | **demo**.example.com            |
-    | CNAME | **www**             | **www**.example.com             |
-    | MX    | **example.com**     | example.com                     |
-    | TXT   | **dkim._domainkey** | **dkim._domainkey**.example.com |
-    | TXT   | **_dmarc**          | **_dmarc**.example.com          |
-    | TXT   | **example.com**     | example.com                     |
+    | TYPE  | DOMAIN      | NAME                | REFERENCED AS                   |
+    |:------|:------------|:--------------------|:--------------------------------|
+    | A     | example.com | **example.com**     | example.com                     |
+    | AAAA  | example.com | **example.com**     | example.com                     |
+    | A     | example.com | **demo**            | **demo**.example.com            |
+    | CNAME | example.com | **www**             | **www**.example.com             |
+    | MX    | example.com | **example.com**     | example.com                     |
+    | TXT   | example.com | **dkim._domainkey** | **dkim._domainkey**.example.com |
+    | TXT   | example.com | **_dmarc**          | **_dmarc**.example.com          |
+    | TXT   | example.com | **example.com**     | example.com                     |
 
     <br />  
 
@@ -93,9 +93,6 @@ Your Cloudflare credentials are read from a file. Rename `auth.json.template` as
 
 
 ## Examples
-
-All examples are based on the domain `example.com` [ `-d example.com` ] 
-
 
 #### Add New DNS Records
 
@@ -265,6 +262,12 @@ NOTE: This example uses the legacy API key [`-k`] to authenticate.
 <br />
 
 ## Limitations
+
+- Requires an existing zone record for the domain being updated.
+
+    <br />
+
+
 - New DNS records can be created and existing DNS records can be updated, but there is currently no option to delete existing DNS records.
 
     <br />
