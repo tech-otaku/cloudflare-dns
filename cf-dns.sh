@@ -1,5 +1,15 @@
 #!/usr/bin/env bash
 
+# AUTHOR: Steve Ward [steve at tech-otaku dot com]
+# URL: https://github.com/tech-otaku/cloudflare-dns.git
+# README: https://github.com/tech-otaku/cloudflare-dns/blob/master/README.md
+
+# USAGE: ./cf-dns.sh -d DOMAIN -n NAME -t TYPE -c CONTENT -p PRIORITY -l TTL -x PROXIED [-k] [-o]
+# EXAMPLE: ./cf-dns.sh -d example.com -t A -n example.com -c 203.0.113.50 -l 1 -x y
+#   See the README for more examples
+
+
+
 # # # # # # # # # # # # # # # # 
 # START-UP CHECKS
 #
