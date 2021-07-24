@@ -200,7 +200,7 @@ EOF
         fi
     fi
 
-# TTL is missing or invalid. Must be specified and be an integer >= 1 
+# TTL is missing or invalid. Must be specified and be an integer >= 1
     if ( [ -z $TTL ] || [[ ! $TTL =~ ^[0-9]*$ ]] || [ ! $TTL -ge 1 ] ); then
         printf "\nERROR: * * * DNS record TTL missing or invalid. * * *\n"
         usage
@@ -221,7 +221,7 @@ EOF
 #
 
 # Override 'Proxy status'
-    if [ $TTL != "1" ] && [ $PROXIED != "false" ]; then
+    if [ $TTL != "1" ] && [[ $PROXIED != "false" ]]; then
         # A TTL other than "1" can only be set if the DNS record's 'Proxy status' is 'DNS only'  
         PROXIED="false"
     fi
@@ -257,10 +257,10 @@ $(curl -X GET "https://api.cloudflare.com/client/v4/zones?name=$DOMAIN" \
         exit 1
     fi
     
-# Get the DNS record's ID based on type, name and content
+# Get the DNS record's ID based on type, name and content.
     printf "\nGetting ID for DNS '%s' record named '%s' whose content is '%s'\n" "$TYPE" "$NAME" "$CONTENT"
     DNS_ID=\
-$(curl -X GET "https://api.cloudflare.com/client/v4/zones/$ZONE_ID/dns_records?type=$TYPE&name=$NAME&content=$CONTENT" \
+$(curl -G -X GET "https://api.cloudflare.com/client/v4/zones/$ZONE_ID/dns_records" --data-urlencode "type=$TYPE" --data-urlencode "name=$NAME" --data-urlencode "content=$CONTENT" \
         "${AUTH_HEADERS[@]/#/-H}" \
         -H "Content-Type: application/json" \
         | python3 -c "import sys,json;data=json.loads(sys.stdin.read()); print(data['result'][0]['id'] if data['result'] else '')");
@@ -269,7 +269,7 @@ $(curl -X GET "https://api.cloudflare.com/client/v4/zones/$ZONE_ID/dns_records?t
     if [ -z "$DNS_ID" ]; then
         printf "\nGetting ID for DNS '%s' record named '%s'\n" "$TYPE" "$NAME"
         DNS_ID=\
-$(curl -X GET "https://api.cloudflare.com/client/v4/zones/$ZONE_ID/dns_records?type=$TYPE&name=$NAME" \
+$(curl -G -X GET "https://api.cloudflare.com/client/v4/zones/$ZONE_ID/dns_records" --data-urlencode "type=$TYPE" --data-urlencode "name=$NAME" \
             "${AUTH_HEADERS[@]/#/-H}" \
             -H "Content-Type: application/json" \
             | python3 -c "import sys,json;data=json.loads(sys.stdin.read()); print(data['result'][0]['id'] if data['result'] else '')");
