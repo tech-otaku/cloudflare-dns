@@ -14,6 +14,8 @@
 # START-UP CHECKS
 #
 
+AUTHPATH=./auth.json
+
 # Exit with error if Python 3 is not installed
     if [ ! $(command -v python3) ]; then 
         printf "\nERROR: * * * This script requires Python 3. * * *\n"
@@ -21,7 +23,7 @@
     fi
 
 # Exit with error if the Cloudflare credentials file doesn't exist
-    if [ ! -f ./auth.json ]; then
+    if [ ! -f $AUTHPATH ]; then
         printf "\nERROR: * * * The file containing your Cloudflare credentials '%s' doesn't exist. * * *\n" $(pwd)/auth.json
         exit -1
     fi
@@ -35,9 +37,9 @@
 # CONSTANTS
 #
 
-EMAIL=$(cat ./auth.json | python3 -c "import sys, json; print(json.load(sys.stdin)['cloudflare']['email'])")
-KEY=$(cat ./auth.json | python3 -c "import sys, json; print(json.load(sys.stdin)['cloudflare']['key'])")
-TOKEN=$(cat ./auth.json | python3 -c "import sys, json; print(json.load(sys.stdin)['cloudflare']['token'])")           
+EMAIL=$(cat $AUTHPATH | python3 -c "import sys, json; print(json.load(sys.stdin)['cloudflare']['email'])")
+KEY=$(cat $AUTHPATH | python3 -c "import sys, json; print(json.load(sys.stdin)['cloudflare']['key'])")
+TOKEN=$(cat $AUTHPATH | python3 -c "import sys, json; print(json.load(sys.stdin)['cloudflare']['token'])")           
 
 
 
