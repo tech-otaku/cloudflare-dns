@@ -1,6 +1,10 @@
 .DS_Store
+add.sh
 auth.json
+delete.sh
 f.json
 nf.json
 README.new.md
 test.sh
+update.sh
+update-x.sh

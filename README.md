@@ -1,7 +1,7 @@
 # cloudflare-dns
 
 ## Purpose
-Add or update your domain's DNS records from the command line using the [Cloudflare API](https://api.cloudflare.com/#dns-records-for-a-zone-properties). 
+Add, update or delete your domain's DNS records from the command line using the [Cloudflare API](https://api.cloudflare.com/#dns-records-for-a-zone-properties). 
 
 ## Background
 I initially wrote this script as a quick way of repeatedly adding or updating DNS records for several domains from the command line when I was building and testing my mail server. ***If you're thinking of using it, it's important you read the [Limitations](#limitations) section first*** and check your domain's DNS records on Cloudflare afterwards. 
@@ -9,10 +9,14 @@ I initially wrote this script as a quick way of repeatedly adding or updating DN
 The script is based upon examples of using the Cloudflare API at [Using the Cloudflare API to Manage DNS Records](https://www.tech-otaku.com/web-development/using-cloudflare-api-manage-dns-records/).
 
 ## Usage
-
+#### Help
 `./cf-dns.sh -h`
 
+#### Add or Update
 `./cf-dns.sh -d DOMAIN -n NAME -t TYPE -c CONTENT -p PRIORITY -l TTL -x PROXIED [-k] [-o]`
+
+#### Delete
+`./cf-dns.sh -d DOMAIN -n NAME -t TYPE -c CONTENT -Z [-a]`
 
 ## Options
 
@@ -20,9 +24,9 @@ Use `./cf-dns.sh -h` to see an explanation of the options and their usage.
 
 In addition, please note the following:
 
-- All but the `-k` and `-o` options are required. This is true even when updating an existing DNS record where not all the data is changing. 
+- When adding a new DNS record or updating an existing one, all but the `-k` and `-o` options are required.<sup>**1**</sup> This is true even when updating an existing DNS record where not all the data is changing. 
 
-    For example, to change only the content [`-c CONTENT`] for this record to `198.51.100.54` all data needs to be given:
+    For example, to change only the content (`-c CONTENT`) for this record to `198.51.100.54` all data needs to be given:
 
     | Type | Name            | Content      | Priority | TTL  | Proxy status  |
     |:-----|:----------------|:-------------|:---------|:-----|:--------------|
@@ -40,19 +44,21 @@ In addition, please note the following:
 
     <br />
 
-- Priority [`-p PRIORITY`] is only required for `MX` type DNS records and is ignored for all other DNS record types.
+    <sup>**1**</sup> When using the `-Z` option to delete a record, the only mandatory options are domain (`-d DOMAIN`), name (`-n NAME`), type (`-t TYPE`) and content (`-c CONTENT`). Optionally, use `-a` to supress the prompt asking to confirm deletion.
+
+- Priority (`-p PRIORITY`) is only required for `MX` type DNS records and is ignored for all other DNS record types.
 
     <br />  
 
-- Proxied status [`-x PROXIED`] is not required for `MX` or `TXT` type DNS records and is ignored if specified. These DNS record types can not be proxied through Cloudflare.
+- Proxied status (`-x PROXIED`) is not required for `MX` or `TXT` type DNS records and is ignored if specified. These DNS record types can not be proxied through Cloudflare.
 
     <br />  
 
-- When specifying a TTL [`-l TTL`] other than `1` (Auto), the DNS record's proxy status will be automatically set to `DNS only` regardless of the value of `-x`. This is due to Cloudflare only allowing TTL values other than `1` for DNS records that are *not* proxied.
+- When specifying a TTL (`-l TTL`) other than `1` (Auto), the DNS record's proxy status will be automatically set to `DNS only` regardless of the value of `-x`. This is due to Cloudflare only allowing TTL values other than `1` for DNS records that are *not* proxied.
 
     <br />  
 
-- The script checks if the domain name [`-d DOMAIN`] and DNS record name [`-n NAME`] are the same. If not, the domain name is appended to the DNS record name as per the table below (think `dig TXT example.com` and `dig TXT dkim._domainkey.example.com`). The `-o` option overrides this behaviour, but I can't recall why I initially included it. If used, the option is ignored and will be removed at a later date. 
+- The script checks if the domain name (`-d DOMAIN`) and DNS record name (`-n NAME`) are the same. If not, the domain name is appended to the DNS record name as per the table below (think `dig TXT example.com` and `dig TXT dkim._domainkey.example.com`). The `-o` option overrides this behaviour, but I can't recall why I initially included it. If used, the option is ignored and will be removed at a later date. 
 
     | TYPE  | DOMAIN      | NAME                | REFERENCED AS                   |
     |:------|:------------|:--------------------|:--------------------------------|
@@ -82,7 +88,7 @@ Your Cloudflare credentials are read from a file. Rename `auth.json.template` as
 ```
 {
     "cloudflare": {
-        "email": "your-cloudlare-email",
+        "email": "your-cloudflare-email",
         "key": "your-cloudflare-api-key",
         "token": "your-cloudflare-api-token"
     }
@@ -108,7 +114,7 @@ Your Cloudflare credentials are read from a file. Rename `auth.json.template` as
 
 <br />
 
-`./cf-dns.sh -d example.com -t CNAME -n www -c example.com -l 1 -x n`
+`./cf-dns.sh -d example.com -t CNAME -n www -c example.com -l 1 -x y`
 
 <br />
 
@@ -136,7 +142,7 @@ Your Cloudflare credentials are read from a file. Rename `auth.json.template` as
 
 <br />
 
-NOTE: This example uses the legacy API key [`-k`] to authenticate.
+NOTE: This example uses the legacy API key (`-k`) to authenticate.
 
 <br />
 
@@ -204,7 +210,7 @@ NOTE: This example uses the legacy API key [`-k`] to authenticate.
 
 | Type  | Name | Content         | Priority | TTL   | Proxy status  |
 |:------|:-----|:----------------|:---------|:------|:--------------|
-| CNAME | www  | example.com     | N/A      | ***5 min*** | DNS only      |
+| CNAME | www  | example.com     | N/A      | ***5 min*** | ***DNS only***      |
 
 ---
 
@@ -234,8 +240,7 @@ NOTE: This example uses the legacy API key [`-k`] to authenticate.
 
 <br />
 
-`./cf-dns.sh -d example.com -t TXT -n dkim._domainkey -c 'v=DKIM1; p=MFswDQYJKoZIhvcNAQEBBQADSgAwRwJAYWXi4K8r0xVWXeY5b7nXrdO24E1Yd7bv
-/mNIGcR0FlHdf2Ng3gO1fzAq/x/ae2PIhG1TEj2+mh1BVK1u2oc7/wIDAQAB' -l 1`
+`./cf-dns.sh -d veward.com -t TXT -n dkim._domainkey -c 'v=DKIM1; p=MFswDQYJKoZIhvcNAQEBBQADSgAwRwJAYWXi4K8r0xVWXeY5b7nXrdO24E1Yd7bv /mNIGcR0FlHdf2Ng3gO1fzAq/x/ae2PIhG1TEj2+mh1BVK1u2oc7/wIDAQAB' -l 1`
 
 <br />
 
@@ -255,7 +260,27 @@ NOTE: This example uses the legacy API key [`-k`] to authenticate.
 |:-----|:-------|:--------------------------|:---------|:-----|:--------------|
 | TXT  | _dmarc | v=DMARC1; p=***quarantine***; pct=***75***; r... | N/A      | Auto | DNS only      |
 
+---
+
 <br />
+
+#### Delete Existing DNS Records
+
+`./cf-dns.sh -d example.com -t A -n example.com -c 203.0.113.50 -Z -a`
+
+<br />
+
+NOTE: This example uses the `-a` option which supresses the prompt asking to confirm deletion.
+
+<br />
+
+| Type | Name            | Content      | Priority | TTL  | Proxy status  |
+|:-----|:----------------|:-------------|:---------|:-----|:--------------|
+| A    | example.com     | 203.0.113.50 | N/A      | Auto | Proxied       |
+
+<br />
+
+A DNS record to be deleted is only matched using the combined values of type (`-t TYPE`), name (`-n NAME`) and content (`-c CONTENT`). If no match is found, a second attempt using only type (`-t TYPE`), and name (`-n NAME`) is not made as it is when adding or updating a DNS record.
 
 ---
 
@@ -267,16 +292,11 @@ NOTE: This example uses the legacy API key [`-k`] to authenticate.
 
     <br />
 
-
-- New DNS records can be created and existing DNS records can be updated, but there is currently no option to delete existing DNS records.
-
-    <br />
-
-- Only A, AAAA, CNAME, MX and TXT type DNS records can be added or updated.
+- Only `A`, `AAAA`, `CNAME`, `MX` and `TXT` type DNS records can be added, updated or deleted.
 
     <br />
 
-- Do not use to add a new DNS record or update the content [`-c CONTENT`] of an existing DNS record that has the same type [`-t TYPE`] and name [`-n NAME`] as one or more other DNS records. 
+- Do not use to add a new DNS record or update the content (`-c CONTENT`) of an existing DNS record that has the same type (`-t TYPE`) and name (`-n NAME`) as one or more other DNS records. 
 
     As an example, consider the following two `MX` DNS records that have the same name, but different content:
 
@@ -285,7 +305,7 @@ NOTE: This example uses the legacy API key [`-k`] to authenticate.
    | 1 | MX   | example.com     | alt1.aspmx.l.google.com | 5        | Auto | DNS only     |
    | 2 | MX   | example.com     | aspmx.l.google.com      | 1        | Auto | DNS only     |
  
-   DNS records are first matched using the combined values of type [`-t TYPE`], name [`-n NAME`] and content [`-c CONTENT`].
+   DNS records are first matched using the combined values of type (`-t TYPE`), name (`-n NAME`) and content (`-c CONTENT`).
 
    As such, this first command will correctly match record #1 in the table above and change its `TTL` to `2 min`:
 
@@ -309,9 +329,9 @@ NOTE: This example uses the legacy API key [`-k`] to authenticate.
 
    <br />
 
-    However, if no matching DNS record is found using type [`-t TYPE`], name [`-n NAME`] and content [`-c CONTENT`], a match is attempted using only type [`-t TYPE`] and name [`-n NAME`]. 
+    However, if no matching DNS record is found using type (`-t TYPE`), name (`-n NAME`) and content (`-c CONTENT`), a match is attempted using only type (`-t TYPE`) and name (`-n NAME`). 
     
-    Consequently, if you attempt to change the `Content` of record #2 from `aspmx.l.google.com` to `mail.example.net` or add a new `MX` record named `example.com` with that same content it will in all probability incorrectly change the content of record #1 as this is the first match on type [`-t TYPE`] and name [`-n NAME`]. 
+    Consequently, if you attempt to change the `Content` of record #2 from `aspmx.l.google.com` to `mail.example.net` or add a new `MX` record named `example.com` with that same content it will in all probability incorrectly change the content of record #1 as this is the first match on type (`-t TYPE`) and name (`-n NAME`). 
 
     `./cf-dns.sh -d example.com -t MX -n example.com -c mail.example.net -p 5 -l 120`
 
