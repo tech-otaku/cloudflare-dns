@@ -44,7 +44,7 @@ In addition, please note the following:
 
     <br />
 
-    <sup>**1**</sup> When using the `-Z` option to delete a record, the only mandatory options are domain (`-d DOMAIN`), name (`-n NAME`), type (`-t TYPE`) and content (`-c CONTENT`). Optionally, use `-a` to supress the prompt asking to confirm deletion.
+    <sup>**1**</sup> When using the `-Z` option to delete a record, the only mandatory options are domain (`-d DOMAIN`), name (`-n NAME`), type (`-t TYPE`) and content (`-c CONTENT`). Optionally, use `-a` to suppress the prompt asking to confirm deletion.
 
 - Priority (`-p PRIORITY`) is only required for `MX` type DNS records and is ignored for all other DNS record types.
 
@@ -270,7 +270,7 @@ NOTE: This example uses the legacy API key (`-k`) to authenticate.
 
 <br />
 
-NOTE: This example uses the `-a` option which supresses the prompt asking to confirm deletion.
+NOTE: This example uses the `-a` option which suppresses the prompt asking to confirm deletion.
 
 <br />
 
