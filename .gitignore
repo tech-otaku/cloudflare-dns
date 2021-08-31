@@ -4,6 +4,7 @@ auth.json
 delete.sh
 f.json
 nf.json
+origin-ip.sh
 README.new.md
 test.sh
 update.sh
