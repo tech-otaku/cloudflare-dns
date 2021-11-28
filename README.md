@@ -95,8 +95,100 @@ Your Cloudflare credentials are read from a file. Rename `auth.json.template` as
 }
 ```
 
-`email` and `key` are required if you use a legacy [API key](https://developers.cloudflare.com/api/keys) to authenticate. `token` is required if you authenticate using the preferred [API token](https://developers.cloudflare.com/api/tokens). By default, the script uses your API token. If you want it to use your API key instead you must use the `-k` option. 
+`email` and `key` are required if you use a legacy [API key](https://developers.cloudflare.com/api/keys) to authenticate. `token` is required if you authenticate using the preferred [API token](https://developers.cloudflare.com/api/tokens). By default, the script uses your API token. If you want it to use your API key instead you must use the `-k` option.
 
+## How the Script Works
+
+A domain or site on your Cloudflare account is known as a zone and is assigned a unique 32-character ID by Cloudflare when it's created. A zone contains various DNS records each of which is also assigned its own unique 32-character ID by Cloudflare. A DNS record consists of data identifying its type, name and content amongst other information.
+
+To add a new DNS record the domain's zone ID has to be passed to the Cloudflare API. To update or delete an existing DNS record both the domain's zone ID and the DNS record ID must be passed to the Cloudflare API. The zone ID can be found on the domain's *Overview* page on the Cloudflare dashboard or by using the Cloudflare API to list zones on your Cloudflare account. DNS record IDs can only be found by using the Cloudflare API to list a zone's DNS records. These API calls produce a lot of output and the (correct) IDs can be difficult to find. 
+
+The script helps streamline this process by not needing to know the zone ID and DNS record ID beforehand. 
+
+Consider the following DNS records for the `example.com` domain: 
+
+| # | Type  | Name            | Content                              | Priority | TTL  |Proxy    | 
+|---|-------|-----------------|--------------------------------------|----------|------|---------|
+| 1 | A     | example.com     | 203.0.113.50                         | N/A      |Auto  | Proxied  | 
+| ***2*** | ***AAAA***  | ***example.com***     | ***2001:db8:c010:46d6::1***                | ***N/A***      |***Auto*** | ***Proxied***  |
+| 3 | CNAME | www             | example.com                          | N/A      |Auto  | Proxied  |
+| 4 | MX    | example.com     | aspmx.l.google.com                   | 5        | 3600 | DNS only |
+| 5 | MX    | example.com     | alt2.aspmx.l.google.com              | 5        | 3600 | DNS only |
+| ***6*** | ***MX***    | ***example.com***     | ***mail.example.com***                     | ***5***       | ***Auto*** | ***DNS only*** |
+| 7 | TXT   | dkim._domainkey | v=DKIM1; p=MFswDQYJKoZIhvXjTSNCGv... | N/A      | Auto | DNS only |
+| 8 | TXT   | _dmarc          | v=DMARC1; p=quarantine; pct=75; r... | N/A      | Auto | DNS only |
+| 9 | TXT   | tech-otaku.com  | v=spf1 mx ~all                       | N/A      | Auto | DNS only |
+
+To demonstrate how the script works, let's assume that neither the **AAAA** record (#2) nor the **MX** record pointing to `mail.example.net` (#6) exist.
+
+---
+
+To attempt to add the **AAAA** record with the script I use:
+
+`./cf-dns.sh -d example.com -t AAAA -n example.com -c 2001:db8:c010:46d6::1 -l 1 -x y`
+
+The script executes these steps:
+
+1. It attempts to get the zone ID of the domain (`-d DOMAIN`).
+2. If successful, it then tries to find a single DNS record for that zone that matches a combination of type (`-t TYPE`), name (`-n NAME`) and content (`-c CONTENT`).
+3. If no matching DNS record is found, it further looks for *all* DNS records for the zone using only type (`-t TYPE`) and name (`-n NAME`).
+4. If still no matches are found, a new DNS record is created.
+
+----
+
+To attempt to add the **MX** record with the script I use:
+
+`./cf-dns.sh -d example.com -t MX -n example.com -c mail.example.com -p 5 -l 1`
+
+As with the previous example, the script executes steps 1 to 2. However, on executing step 3 it finds two existing records (#4 and #5) that match type (`-t TYPE`) and name (`-n NAME`) and so displays the following interactive prompt:
+
+```
+Found 2 existing DNS record(s) whose type is 'MX' named 'example.com'
+[1] ID:s5stc17nr83o0szd9rsn9cx56tybwuo0, TYPE:MX, NAME:example.com, CONTENT:aspmx.l.google.com
+[2] ID:a38q5zlhnhpycw05xld4gvlpb8ucelfd, TYPE:MX, NAME:example.com, CONTENT:alt2.aspmx.l.google.com
+[A] Add New DNS Record
+[Q] Quit
+
+Type '1' or '2' to update an existing record, 'A' to add a new record or 'Q' to quit without changes and then press enter:
+```
+As I want to add a new DNS record, I type `A` and press enter and a new DNS record is created.
+
+---
+
+Having created this new **MX** record, I decide to change the *Priority* from **5** to **10** using:
+
+`./cf-dns.sh -d example.com -t MX -n example.com -c mail.example.com -p 10 -l 1`
+
+On this occasion, when executing step 2, the script finds the single existing record that matches type (`-t TYPE`), name (`-n NAME`) and content (`-c CONTENT`) and simply changes its priority to `10`.
+
+---
+
+Later I realise I've made a mistake. This new **MX** record should point to **mail.example.net** and not **mail.example.com**. To change its *Content* I use:
+
+`./cf-dns.sh -d example.com -t MX -n example.com -c mail.example.net -p 10 -l 1`
+
+On executing step 3 the script now finds three existing records (#4, #5 and #6) that match type (`-t TYPE`) and name (`-n NAME`) and so displays the following interactive prompt:
+
+```
+Found 3 existing DNS record(s) whose type is 'MX' named 'example.com'
+[1] ID:s5stc17nr83o0szd9rsn9cx56tybwuo0, TYPE:MX, NAME:example.com, CONTENT:aspmx.l.google.com
+[2] ID:a38q5zlhnhpycw05xld4gvlpb8ucelfd, TYPE:MX, NAME:example.com, CONTENT:alt2.aspmx.l.google.com
+[3] ID:ge8m5b52vjm4uv22kbk7ba506obuknnn, TYPE:MX, NAME:example.com, CONTENT:mail.example.com
+[A] Add New DNS Record
+[Q] Quit
+
+Type '1', '2' or '3' to update an existing record, 'A' to add a new record or 'Q' to quit without changes and then press enter:
+```
+
+Rather than add a new record, I want to update an existing record and so type `3` and press enter to update the appropriate record.
+
+---
+
+When deleting a record, the script only ever performs steps 1 and 2. If it can't find a record matching type (`-t TYPE`), name (`-n NAME`) and content (`-c CONTENT`), it exits.
+
+To delete the **MX** record now pointing to **mail.example.net** use:
+
+`./cf-dns.sh -d example.com -t MX -n example.com -c mail.example.net -Z`
 
 ## Examples
 
@@ -293,49 +385,3 @@ A DNS record to be deleted is only matched using the combined values of type (`-
     <br />
 
 - Only `A`, `AAAA`, `CNAME`, `MX` and `TXT` type DNS records can be added, updated or deleted.
-
-    <br />
-
-- Do not use to add a new DNS record or update the content (`-c CONTENT`) of an existing DNS record that has the same type (`-t TYPE`) and name (`-n NAME`) as one or more other DNS records. 
-
-    As an example, consider the following two `MX` DNS records that have the same name, but different content:
-
-   | # | Type | Name            | Content                 | Priority | TTL  | Proxy status |
-   |---|------|-----------------|-------------------------|----------|------|--------------|
-   | 1 | MX   | example.com     | alt1.aspmx.l.google.com | 5        | Auto | DNS only     |
-   | 2 | MX   | example.com     | aspmx.l.google.com      | 1        | Auto | DNS only     |
- 
-   DNS records are first matched using the combined values of type (`-t TYPE`), name (`-n NAME`) and content (`-c CONTENT`).
-
-   As such, this first command will correctly match record #1 in the table above and change its `TTL` to `2 min`:
-
-   `./cf-dns.sh -d example.com -t MX -n example.com -c alt1.aspmx.l.google.com -l 120`
-
-   | # | Type | Name            | Content                 | Priority | TTL   | Proxy status |
-   |---|------|-----------------|-------------------------|----------|-------|--------------|
-   | 1 | MX   | example.com     | alt1.aspmx.l.google.com | 5        | ***2 min***  | DNS only     |
-   | 2 | MX   | example.com     | aspmx.l.google.com      | 1        | Auto  | DNS only     |
-   
-   <br />
-
-   This second command will correctly match record #2 in the table above and change its `Priority` to `10`:
-   
-   `./cf-dns.sh -d example.com -t MX -n example.com -c aspmx.l.google.com -p 10`
-
-   | # | Type | Name            | Content                 | Priority | TTL    | Proxy status |
-   |---|------|-----------------|-------------------------|----------|--------|--------------|
-   | 1 | MX   | example.com     | alt1.aspmx.l.google.com | 5        | 2 min  | DNS only     |
-   | 2 | MX   | example.com     | aspmx.l.google.com      | ***10***        | Auto | DNS only     |
-
-   <br />
-
-    However, if no matching DNS record is found using type (`-t TYPE`), name (`-n NAME`) and content (`-c CONTENT`), a match is attempted using only type (`-t TYPE`) and name (`-n NAME`). 
-    
-    Consequently, if you attempt to change the `Content` of record #2 from `aspmx.l.google.com` to `mail.example.net` or add a new `MX` record named `example.com` with that same content it will in all probability incorrectly change the content of record #1 as this is the first match on type (`-t TYPE`) and name (`-n NAME`). 
-
-    `./cf-dns.sh -d example.com -t MX -n example.com -c mail.example.net -p 5 -l 120`
-
-   | # | Type | Name            | Content                 | Priority | TTL  | Proxy status |
-   |---|------|-----------------|-------------------------|----------|------|--------------|
-   | 1 | MX   | example.com     | ***mail.example.net***        | 5        | 2 min | DNS only     |
-   | 2 | MX   | example.com     | aspmx.l.google.com      | 10       | Auto  | DNS only     |

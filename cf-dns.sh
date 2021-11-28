@@ -56,17 +56,26 @@ AUTH_HEADERS=( "Authorization: Bearer $TOKEN" )
 # FUNCTION DECLARATIONS
 #
 
+# Function to execute when the script terminates
+    function tidy_up {
+        rm -f $TEMPFILE
+    }
+
+# Ensure the `tidy_up` function is executed every time the script terminates regardless of exit status
+    trap tidy_up EXIT
+
 # Function to display usage help
     function usage {
         cat << EOF
                     
     Syntax: 
     ./$(basename $0) -h
-    ./$(basename $0) -d DOMAIN -n NAME -t TYPE -c CONTENT -p PRIORITY -l TTL -x PROXIED [-k] [-o]
+    ./$(basename $0) -d DOMAIN -n NAME -t TYPE -c CONTENT -p PRIORITY -l TTL -x PROXIED [-k] [-o] [-A]
     ./$(basename $0) -d DOMAIN -n NAME -t TYPE -c CONTENT -Z [-a] 
 
     Options:
     -a              Auto mode. Do not prompt for user interaction.
+    -A              Force add new DNS record. Prompts to overwrite existing DNS record(s) if omitted.
     -c CONTENT      DNS record content. REQUIRED.
     -d DOMAIN       The domain name. REQUIRED.
     -h              This help message.
@@ -75,7 +84,7 @@ AUTH_HEADERS=( "Authorization: Bearer $TOKEN" )
     -n NAME         DNS record name. REQUIRED.
     -o              Override use of NAME.DOMAIN to reference applicable DNS record.
     -p PRIORITY     The priority value for an MX type DNS record. Must be an integer >= 0. REQUIRED for MX type record.
-    -t TYPE         DNS record type. Must be one of A, AAAA, CNAME, MX or TXT. REQUIRED.
+    -t TYPE         DNS record type. Must be one of A, AAAA, CNAME, MX or TXT. REQUIRED.       
     -x PROXIED      Should the DNS record be proxied? Must be one of y, Y, n or N. REQUIRED.
     -Z DELETE       Delete a given DNS record.
 
@@ -101,7 +110,7 @@ EOF
     fi
 
 # Prevent an option that expects an argument from taking the next option as an argument if its own argument is omitted. i.e. -d -n www 
-    while getopts ':ac:d:hl:n:op:t:x:Z' opt; do
+    while getopts ':aAc:d:hl:n:op:t:x:Z' opt; do
         if [[ $OPTARG =~ ^\-.? ]]; then
             printf "\nERROR: * * * '%s' is not valid argument for option '-%s'\n" $OPTARG $opt
             usage
@@ -113,11 +122,15 @@ EOF
     OPTIND=1        
 
 # Process command line options
-    while getopts ':ac:d:hkl:n:op:t:x:Z' opt; do
+    while getopts ':aAc:d:hkl:n:op:t:x:Z' opt; do
         case $opt in
             a)
                 # This variable is only ever tested to confirm if it's set (non-zero length string) or not (zero length string). Its actual value is of no significance. 
                 AUTO=true
+                ;;
+            A)
+                # This variable is only ever tested to confirm if it's set (non-zero length string) or not (zero length string). Its actual value is of no significance. 
+                ADD=true
                 ;;
             c) 
                 CONTENT=$OPTARG 
@@ -300,20 +313,65 @@ EOF
 # Add a new DNS record or update an existing one.
     if [ -z "$DELETE" ]; then
 
-    # If no DNS record was found matching type, name and content look for a DNS record matching type and name only
+    # If no DNS record was found matching type, name and content look for all DNS records matching only type and name
         if [ -z "$DNS_ID" ]; then
-            printf "\nAttempting to get ID for DNS '%s' record named '%s'\n" "$TYPE" "$NAME"
-            DNS_ID=$(
-                curl -G "https://api.cloudflare.com/client/v4/zones/$ZONE_ID/dns_records" --data-urlencode "type=$TYPE" --data-urlencode "name=$NAME" \
-                "${AUTH_HEADERS[@]/#/-H}" \
-                | python3 -c "import sys,json;data=json.loads(sys.stdin.read()); print(data['result'][0]['id'] if data['result'] else '')"
-            )
 
-            if [ -z "$DNS_ID" ]; then
-                printf ">>> %s\n" "No record found (2)"
+            TMPFILE=$(mktemp)
+
+            printf "\nAttempting to get all DNS records whose type is '%s' named '%s'\n" "$TYPE" "$NAME"
+            curl -G "https://api.cloudflare.com/client/v4/zones/$ZONE_ID/dns_records" --data-urlencode "type=$TYPE" --data-urlencode "name=$NAME" \
+            "${AUTH_HEADERS[@]/#/-H}" \
+            | python -c $'import sys,json\ndata=json.loads(sys.stdin.read())\nif data["success"]:\n\tfor dict in data["result"]:print(dict["id"] + "," + dict["type"] + "," + dict["name"] + "," + dict["content"])\nelse:print("ERROR(" + str(data["errors"][0]["code"]) + "): " + data["errors"][0]["message"])' > $TMPFILE
+
+            if [ $(wc -l < $TMPFILE) -gt 0 ]; then
+                printf "\nFound %s existing DNS record(s) whose type is '%s' named '%s'\n" $(wc -l < $TMPFILE) "$TYPE" "$NAME"
+                i=0
+                while read record; do
+                    i=$((i+1))
+                    printf '[%s] ID:%s, TYPE:%s, NAME:%s, CONTENT:%s\n' $i "$(printf '%s' "$record" | cut -d ',' -f1)" "$(printf '%s' "$record" | cut -d ',' -f2)" "$(printf '%s' "$record" | cut -d ',' -f3)" "$(printf '%s' "$record" | cut -d ',' -f4)"
+#                    echo "[$i] $record"
+                done < $TMPFILE
+                echo "[A] Add New DNS Record"
+                echo -e "[Q] Quit\n"
+            
+                while true; do
+                    read -p "Type $(for((x=1;x<=$i;++x)); do printf "'%s', " $x; done | rev | cut -c3- | sed 's/ ,/ ro /' | rev) to update an existing record, 'A' to add a new record or 'Q' to quit without changes and then press enter: " ANSWER
+                    case $ANSWER in
+                        [1-$i]) 
+                            DNS_ID=$(sed -n $ANSWER'p' < $TMPFILE | cut -d ',' -f1 | cut -d ':' -f2); 
+                            break;;
+                        [aA])
+                            unset DNS_ID; 
+                            break;;
+                        [qQ]) 
+                            exit
+                            ;;
+                        *) 
+    #                        echo "Please enter a valid option."
+                            ;;
+                    esac
+                done
+
             else
-                printf ">>> %s\n" "$DNS_ID"
+
+                printf ">>> %s\n" "No record(s) found (2)"
+
             fi
+
+#            echo $DNS_ID
+
+#            printf "\nAttempting to get ID for DNS '%s' record named '%s'\n" "$TYPE" "$NAME"
+#            DNS_ID=$(
+#                curl -G "https://api.cloudflare.com/client/v4/zones/$ZONE_ID/dns_records" --data-urlencode "type=$TYPE" --data-urlencode "name=$NAME" \
+#                "${AUTH_HEADERS[@]/#/-H}" \
+#                | python3 -c "import sys,json;data=json.loads(sys.stdin.read()); print(data['result'][0]['id'] if data['result'] else '')"
+#            )
+
+#            if [ -z "$DNS_ID" ]; then
+#                printf ">>> %s\n" "No record found (2)"
+#            else
+#                printf ">>> %s\n" "$DNS_ID"
+#            fi
         fi
 
         if [ -z "$DNS_ID" ]; then
@@ -355,7 +413,7 @@ EOF
             printf "\nWARNING: * * * No $RECORD exists * * *\n" 
         else
             if [ -z $AUTO ]; then
-               read -r -p "$(echo -e '\n'Delete the $RECORD ? [Y/n] )" RESPONSE
+               read -r -p "$(echo -e '\n'Delete the $RECORD [Y/n]?) " RESPONSE
             else
                 RESPONSE=Y
             fi
