@@ -27,7 +27,7 @@
     fi
 
 # Unset all variables
-    unset APIKEY AUTH_HEADERS AUTO CONTENT DELETE DNS_ID DOMAIN EMAIL KEY NAME OVERRIDE PRIORITY PROXIED RECORD REQUEST RESPONSE TOKEN TTL TYPE ZONE_ID 
+    unset ANSWER APIKEY AUTH_HEADERS AUTO CONTENT DELETE DNS_ID DOMAIN EMAIL KEY NAME OVERRIDE PRIORITY PROXIED RECORD REQUEST RESPONSE TMPFILE TOKEN TTL TYPE ZONE_ID 
 
 
 
@@ -58,7 +58,7 @@ AUTH_HEADERS=( "Authorization: Bearer $TOKEN" )
 
 # Function to execute when the script terminates
     function tidy_up {
-        rm -f $TEMPFILE
+        rm -f $TMPFILE
     }
 
 # Ensure the `tidy_up` function is executed every time the script terminates regardless of exit status
@@ -329,7 +329,6 @@ EOF
                 while read record; do
                     i=$((i+1))
                     printf '[%s] ID:%s, TYPE:%s, NAME:%s, CONTENT:%s\n' $i "$(printf '%s' "$record" | cut -d ',' -f1)" "$(printf '%s' "$record" | cut -d ',' -f2)" "$(printf '%s' "$record" | cut -d ',' -f3)" "$(printf '%s' "$record" | cut -d ',' -f4)"
-#                    echo "[$i] $record"
                 done < $TMPFILE
                 echo "[A] Add New DNS Record"
                 echo -e "[Q] Quit\n"
@@ -358,20 +357,6 @@ EOF
 
             fi
 
-#            echo $DNS_ID
-
-#            printf "\nAttempting to get ID for DNS '%s' record named '%s'\n" "$TYPE" "$NAME"
-#            DNS_ID=$(
-#                curl -G "https://api.cloudflare.com/client/v4/zones/$ZONE_ID/dns_records" --data-urlencode "type=$TYPE" --data-urlencode "name=$NAME" \
-#                "${AUTH_HEADERS[@]/#/-H}" \
-#                | python3 -c "import sys,json;data=json.loads(sys.stdin.read()); print(data['result'][0]['id'] if data['result'] else '')"
-#            )
-
-#            if [ -z "$DNS_ID" ]; then
-#                printf ">>> %s\n" "No record found (2)"
-#            else
-#                printf ">>> %s\n" "$DNS_ID"
-#            fi
         fi
 
         if [ -z "$DNS_ID" ]; then
