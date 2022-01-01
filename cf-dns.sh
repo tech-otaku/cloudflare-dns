@@ -110,7 +110,7 @@ EOF
     fi
 
 # Prevent an option that expects an argument from taking the next option as an argument if its own argument is omitted. i.e. -d -n www 
-    while getopts ':aAc:d:hl:n:op:t:x:Z' opt; do
+    while getopts ':aAc:d:hkl:n:op:t:x:Z' opt; do
         if [[ $OPTARG =~ ^\-.? ]]; then
             printf "\nERROR: * * * '%s' is not valid argument for option '-%s'\n" $OPTARG $opt
             usage
