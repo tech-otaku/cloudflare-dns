@@ -117,9 +117,9 @@ Consider the following DNS records for the `example.com` domain:
 | ***6*** | ***MX***    | ***example.com***     | ***mail.example.com***                     | ***5***       | ***Auto*** | ***DNS only*** |
 | 7 | TXT   | dkim._domainkey | v=DKIM1; p=MFswDQYJKoZIhvXjTSNCGv... | N/A      | Auto | DNS only |
 | 8 | TXT   | _dmarc          | v=DMARC1; p=quarantine; pct=75; r... | N/A      | Auto | DNS only |
-| 9 | TXT   | tech-otaku.com  | v=spf1 mx ~all                       | N/A      | Auto | DNS only |
+| 9 | TXT   | example.com     | v=spf1 mx ~all                       | N/A      | Auto | DNS only |
 
-To demonstrate how the script works, let's assume that neither the **AAAA** record (#2) nor the **MX** record pointing to `mail.example.net` (#6) exist.
+To demonstrate how the script works, let's assume that neither the **AAAA** record (#2) nor the **MX** record pointing to **mail.example.com** (#6) exist.
 
 ---
 
@@ -382,6 +382,4 @@ A DNS record to be deleted is only matched using the combined values of type (`-
 
 - Requires an existing zone record for the domain being updated.
 
-    <br />
-
-- Only `A`, `AAAA`, `CNAME`, `MX` and `TXT` type DNS records can be added, updated or deleted.
+- Only **A**, **AAAA**, **CNAME**, **MX** and **TXT** type DNS records can be added, updated or deleted.
