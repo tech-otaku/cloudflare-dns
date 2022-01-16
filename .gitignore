@@ -9,3 +9,5 @@ README.new.md
 test.sh
 update.sh
 update-x.sh
+.vscode
+__pycache__
