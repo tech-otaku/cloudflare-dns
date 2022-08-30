@@ -282,7 +282,7 @@ EOF
 # Get the domain's zone ID
     printf "\nAttempting to get zone ID for domain '%s'\n" $DOMAIN
     ZONE_ID=$(
-        curl -X GET "https://api.cloudflare.com/client/v4/zones?name=$DOMAIN" \
+        curl -s -X GET "https://api.cloudflare.com/client/v4/zones?name=$DOMAIN" \
         "${AUTH_HEADERS[@]/#/-H}" \
         -H "Content-Type: application/json" \
         | python3 -c "import sys,json;data=json.loads(sys.stdin.read()); print(data['result'][0]['id'] if data['result'] else '')"
@@ -298,7 +298,7 @@ EOF
 # Get the DNS record's ID based on type, name and content
     printf "\nAttempting to get ID for DNS '%s' record named '%s' whose content is '%s'\n" "$TYPE" "$NAME" "$CONTENT"
     DNS_ID=$(
-        curl -G "https://api.cloudflare.com/client/v4/zones/$ZONE_ID/dns_records" --data-urlencode "type=$TYPE" --data-urlencode "name=$NAME" --data-urlencode "content=$CONTENT" \
+        curl -s -G "https://api.cloudflare.com/client/v4/zones/$ZONE_ID/dns_records" --data-urlencode "type=$TYPE" --data-urlencode "name=$NAME" --data-urlencode "content=$CONTENT" \
         "${AUTH_HEADERS[@]/#/-H}" \
         -H "Content-Type: application/json" \
         | python3 -c "import sys,json;data=json.loads(sys.stdin.read()); print(data['result'][0]['id'] if data['result'] else '')"
@@ -319,9 +319,9 @@ EOF
             TMPFILE=$(mktemp)
 
             printf "\nAttempting to get all DNS records whose type is '%s' named '%s'\n" "$TYPE" "$NAME"
-            curl -G "https://api.cloudflare.com/client/v4/zones/$ZONE_ID/dns_records" --data-urlencode "type=$TYPE" --data-urlencode "name=$NAME" \
+            curl -s -G "https://api.cloudflare.com/client/v4/zones/$ZONE_ID/dns_records" --data-urlencode "type=$TYPE" --data-urlencode "name=$NAME" \
             "${AUTH_HEADERS[@]/#/-H}" \
-            | python -c $'import sys,json\ndata=json.loads(sys.stdin.read())\nif data["success"]:\n\tfor dict in data["result"]:print(dict["id"] + "," + dict["type"] + "," + dict["name"] + "," + dict["content"])\nelse:print("ERROR(" + str(data["errors"][0]["code"]) + "): " + data["errors"][0]["message"])' > $TMPFILE
+            | python3 -c $'import sys,json\ndata=json.loads(sys.stdin.read())\nif data["success"]:\n\tfor dict in data["result"]:print(dict["id"] + "," + dict["type"] + "," + dict["name"] + "," + dict["content"])\nelse:print("ERROR(" + str(data["errors"][0]["code"]) + "): " + data["errors"][0]["message"])' > $TMPFILE
 
             if [ $(wc -l < $TMPFILE) -gt 0 ]; then
                 printf "\nFound %s existing DNS record(s) whose type is '%s' named '%s'\n" $(wc -l < $TMPFILE) "$TYPE" "$NAME"
@@ -370,21 +370,27 @@ EOF
         fi
 
         if [ $TYPE == "A" ] || [  $TYPE == "AAAA" ] || [ $TYPE == "CNAME" ]; then
-            curl ${REQUEST[@]/#/-X} \
+            curl -s ${REQUEST[@]/#/-X} \
             "${AUTH_HEADERS[@]/#/-H}" \
             -H "Content-Type: application/json" \
+            -H 'X-Auth-Key: $KEY' \
+            -H 'X-Auth-Email: $EMAIL' \
             --data '{"type":"'"$TYPE"'","name":"'"$NAME"'","content":"'"$CONTENT"'","proxied":'"$PROXIED"',"ttl":'"$TTL"'}' \
             | python3 -m json.tool --sort-keys
         elif [ $TYPE == "MX" ]; then
-            curl ${REQUEST[@]/#/-X} \
+            curl -s ${REQUEST[@]/#/-X} \
             "${AUTH_HEADERS[@]/#/-H}" \
             -H "Content-Type: application/json" \
+            -H 'X-Auth-Key: $KEY' \
+            -H 'X-Auth-Email: $EMAIL' \
             --data '{"type":"'"$TYPE"'","name":"'"$NAME"'","content":"'"$CONTENT"'","priority":'"$PRIORITY"',"ttl":'"$TTL"'}' \
             | python3 -m json.tool --sort-keys
         else
-            curl ${REQUEST[@]/#/-X} \
+            curl -s ${REQUEST[@]/#/-X} \
             "${AUTH_HEADERS[@]/#/-H}" \
             -H "Content-Type: application/json" \
+            -H 'X-Auth-Key: $KEY' \
+            -H 'X-Auth-Email: $EMAIL' \
             --data '{"type":"'"$TYPE"'","name":"'"$NAME"'","content":"'"$CONTENT"'","ttl":'"$TTL"'}' \
             | python3 -m json.tool --sort-keys
         fi 
@@ -407,7 +413,7 @@ EOF
 
                 printf "\nDeleteing the $RECORD\n"      
 
-                curl -X DELETE "https://api.cloudflare.com/client/v4/zones/$ZONE_ID/dns_records/$DNS_ID" \
+                curl -s -X DELETE "https://api.cloudflare.com/client/v4/zones/$ZONE_ID/dns_records/$DNS_ID" \
                 "${AUTH_HEADERS[@]/#/-H}" \
                 -H "Content-Type: application/json" \
                 | python3 -m json.tool --sort-keys
