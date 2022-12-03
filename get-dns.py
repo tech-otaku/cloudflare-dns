@@ -190,9 +190,9 @@ def main():
                 if proxied.lower() in 'false':
                     proxied = 'N'
 
-            output += f'./cf-dns.sh -d {domain} -t {record_type} -n {name} -c {content}' + (f' -p {priority}' if record_type.upper() in 'MX' else '') + (f' -x {proxied}' if proxiable.lower() in 'true' else '') + f' -l {ttl} [-k]\n'
+            output += f'./cf-dns.sh -d {domain} -t {record_type} -n {name} -c {content}' + (f' -p {priority}' if record_type.upper() in 'MX' else '') + (f' -x {proxied}' if proxiable.lower() in 'true' else '') + f' -l {ttl} [-k] [-s] [-A]\n'
 
-            output += f'./cf-dns.sh -d {domain} -t {record_type} -n {name} -c {content} -Z [-a] [-k]\n\n'
+            output += f'./cf-dns.sh -d {domain} -t {record_type} -n {name} -c {content} -Z [-a] [-k] [-s]\n\n'
 
             output += '* ' * 50 + '\n'
         
