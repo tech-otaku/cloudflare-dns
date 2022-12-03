@@ -8,6 +8,8 @@ I initially wrote this script as a quick way of repeatedly adding or updating DN
 
 The script is based upon examples of using the Cloudflare API at [Using the Cloudflare API to Manage DNS Records](https://www.tech-otaku.com/web-development/using-cloudflare-api-manage-dns-records/).
 
+To view an existing domain's current DNS records see [Get an Existing Domain's Current DNS Records](#get-an-existing-domains-current-dns-records)
+
 ## Usage
 #### Help
 `./cf-dns.sh -h`
@@ -383,3 +385,48 @@ A DNS record to be deleted is only matched using the combined values of type (`-
 - Requires an existing zone record for the domain being updated.
 
 - Only **A**, **AAAA**, **CNAME**, **MX** and **TXT** type DNS records can be added, updated or deleted.
+
+## Get an Existing Domain's Current DNS Records
+
+`get-dns.py` is a script that gets all of an existing domain's current DNS records. For each DNS record it displays a sub-set of the data returned from the API call together with the arguments required to delete that record and create it using the `cf-dns.sh` script. It can optionally include all of the record's data as raw JSON. Output can be directed to a file or to the user's screen.
+
+### Usage
+`./get-dns.py -h/--help`
+
+`./get-dns.py -d/--domain DOMAIN [-k/--key] [-p/--pretty] [-r/--raw] [-s/--screen]`
+
+### Example
+
+`./get-dns.py --domain=example.com --raw --screen`
+
+### Sample Output
+
+```
+...
+
+Record: 4/7 
+
+{"content": "aspmx.l.google.com", "created_on": "2020-09-17T11:18:19.583054Z", "id": "7bdb2e46037df332e5abdd45f8f981f5",
+ "locked": false, "meta": {"auto_added": false, "managed_by_apps": false, "managed_by_argo_tunnel": false, "source": 
+ "primary"}, "modified_on": "2020-09-17T11:18:19.583054Z", "name": "example.com", "priority": 5, "proxiable": false, 
+ "proxied": false, "ttl": 3600, "type": "MX", "zone_id": "8b717207bcee4047af2e9dff95832996", "zone_name": "example.com"} 
+
+Domain: example.com
+Type: MX
+Name: example.com
+Content: aspmx.l.google.com
+Priority: 5
+Proxiable: False
+Proxied: False
+TTL: 3600
+Modified: 2020-09-17T11:18:19.583054Z
+./cf-dns.sh -d example.com -t MX -n example.com -c aspmx.l.google.com -p 5 -l 3600 [-k]
+./cf-dns.sh -d example.com -t MX -n example.com -c aspmx.l.google.com -Z [-a] [-k] 
+
+* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+
+Record: 5/7
+
+...
+
+```
