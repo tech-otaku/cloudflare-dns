@@ -15,10 +15,10 @@ To view an existing domain's current DNS records see [Get an Existing Domain's C
 `./cf-dns.sh -h`
 
 #### Add or Update
-`./cf-dns.sh -d DOMAIN -n NAME -t TYPE -c CONTENT -p PRIORITY -l TTL -x PROXIED [-k] [-o]`
+`./cf-dns.sh -d DOMAIN -n NAME -t TYPE -c CONTENT -p PRIORITY -l TTL -x PROXIED [-k] [-s] [-o] [-A]`
 
 #### Delete
-`./cf-dns.sh -d DOMAIN -n NAME -t TYPE -c CONTENT -Z [-a]`
+`./cf-dns.sh -d DOMAIN -n NAME -t TYPE -c CONTENT -Z [-a] [-k] [-s] [-o]`
 
 ## Options
 
