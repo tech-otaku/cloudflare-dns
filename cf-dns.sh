@@ -27,7 +27,7 @@
     fi
 
 # Unset all variables
-    unset ANSWER APIKEY AUTH_HEADERS AUTO CONTENT DELETE DNS_ID DOMAIN EMAIL KEY NAME OVERRIDE PRIORITY PROXIED RECORD REQUEST RESPONSE TMPFILE TOKEN TTL TYPE ZONE_ID 
+    unset ANSWER APIKEY AUTH_HEADERS AUTO CONTENT DELETE DNS_ID DOMAIN EMAIL KEY MODE NAME OVERRIDE PRIORITY PROXIED RECORD REQUEST RESPONSE TMPFILE TOKEN TTL TYPE ZONE_ID 
 
 
 
@@ -46,6 +46,7 @@ TOKEN=$(cat ./auth.json | python3 -c "import sys, json; print(json.load(sys.stdi
 #
 
 AUTH_HEADERS=( "Authorization: Bearer $TOKEN" )
+MODE="--silent"
 #PRIORITY="5"
 #PROXIED="true"
 #TTL="1"
@@ -70,8 +71,8 @@ AUTH_HEADERS=( "Authorization: Bearer $TOKEN" )
                     
     Syntax: 
     ./$(basename $0) -h
-    ./$(basename $0) -d DOMAIN -n NAME -t TYPE -c CONTENT -p PRIORITY -l TTL -x PROXIED [-k] [-o] [-A]
-    ./$(basename $0) -d DOMAIN -n NAME -t TYPE -c CONTENT -Z [-a] 
+    ./$(basename $0) -d DOMAIN -n NAME -t TYPE -c CONTENT -p PRIORITY -l TTL -x PROXIED [-k] [-s] [-o] [-A]
+    ./$(basename $0) -d DOMAIN -n NAME -t TYPE -c CONTENT -Z [-a] [-k] [-s] [-o] 
 
     Options:
     -a              Auto mode. Do not prompt for user interaction.
@@ -84,6 +85,7 @@ AUTH_HEADERS=( "Authorization: Bearer $TOKEN" )
     -n NAME         DNS record name. REQUIRED.
     -o              Override use of NAME.DOMAIN to reference applicable DNS record.
     -p PRIORITY     The priority value for an MX type DNS record. Must be an integer >= 0. REQUIRED for MX type record.
+    -s              Show curl's progress meter and error messages. Curl is silent if omitted.
     -t TYPE         DNS record type. Must be one of A, AAAA, CNAME, MX or TXT. REQUIRED.       
     -x PROXIED      Should the DNS record be proxied? Must be one of y, Y, n or N. REQUIRED.
     -Z DELETE       Delete a given DNS record.
@@ -110,7 +112,7 @@ EOF
     fi
 
 # Prevent an option that expects an argument from taking the next option as an argument if its own argument is omitted. i.e. -d -n www 
-    while getopts ':aAc:d:hkl:n:op:t:x:Z' opt; do
+    while getopts ':aAc:d:hkl:n:op:st:x:Z' opt; do
         if [[ $OPTARG =~ ^\-.? ]]; then
             printf "\nERROR: * * * '%s' is not valid argument for option '-%s'\n" $OPTARG $opt
             usage
@@ -122,7 +124,7 @@ EOF
     OPTIND=1        
 
 # Process command line options
-    while getopts ':aAc:d:hkl:n:op:t:x:Z' opt; do
+    while getopts ':aAc:d:hkl:n:op:st:x:Z' opt; do
         case $opt in
             a)
                 # This variable is only ever tested to confirm if it's set (non-zero length string) or not (zero length string). Its actual value is of no significance. 
@@ -158,6 +160,9 @@ EOF
                 ;;
             p) 
                 PRIORITY=$OPTARG  
+                ;;
+            s) 
+                MODE="--no-silent" 
                 ;;
             t) 
                 TYPE=$(echo $OPTARG | tr '[:lower:]' '[:upper:]')  
@@ -282,7 +287,7 @@ EOF
 # Get the domain's zone ID
     printf "\nAttempting to get zone ID for domain '%s'\n" $DOMAIN
     ZONE_ID=$(
-        curl -X GET "https://api.cloudflare.com/client/v4/zones?name=$DOMAIN" \
+        curl $MODE -X GET "https://api.cloudflare.com/client/v4/zones?name=$DOMAIN" \
         "${AUTH_HEADERS[@]/#/-H}" \
         -H "Content-Type: application/json" \
         | python3 -c "import sys,json;data=json.loads(sys.stdin.read()); print(data['result'][0]['id'] if data['result'] else '')"
@@ -298,7 +303,7 @@ EOF
 # Get the DNS record's ID based on type, name and content
     printf "\nAttempting to get ID for DNS '%s' record named '%s' whose content is '%s'\n" "$TYPE" "$NAME" "$CONTENT"
     DNS_ID=$(
-        curl -G "https://api.cloudflare.com/client/v4/zones/$ZONE_ID/dns_records" --data-urlencode "type=$TYPE" --data-urlencode "name=$NAME" --data-urlencode "content=$CONTENT" \
+        curl $MODE -G "https://api.cloudflare.com/client/v4/zones/$ZONE_ID/dns_records" --data-urlencode "type=$TYPE" --data-urlencode "name=$NAME" --data-urlencode "content=$CONTENT" \
         "${AUTH_HEADERS[@]/#/-H}" \
         -H "Content-Type: application/json" \
         | python3 -c "import sys,json;data=json.loads(sys.stdin.read()); print(data['result'][0]['id'] if data['result'] else '')"
@@ -319,9 +324,9 @@ EOF
             TMPFILE=$(mktemp)
 
             printf "\nAttempting to get all DNS records whose type is '%s' named '%s'\n" "$TYPE" "$NAME"
-            curl -G "https://api.cloudflare.com/client/v4/zones/$ZONE_ID/dns_records" --data-urlencode "type=$TYPE" --data-urlencode "name=$NAME" \
+            curl $MODE -G "https://api.cloudflare.com/client/v4/zones/$ZONE_ID/dns_records" --data-urlencode "type=$TYPE" --data-urlencode "name=$NAME" \
             "${AUTH_HEADERS[@]/#/-H}" \
-            | python -c $'import sys,json\ndata=json.loads(sys.stdin.read())\nif data["success"]:\n\tfor dict in data["result"]:print(dict["id"] + "," + dict["type"] + "," + dict["name"] + "," + dict["content"])\nelse:print("ERROR(" + str(data["errors"][0]["code"]) + "): " + data["errors"][0]["message"])' > $TMPFILE
+            | python3 -c $'import sys,json\ndata=json.loads(sys.stdin.read())\nif data["success"]:\n\tfor dict in data["result"]:print(dict["id"] + "," + dict["type"] + "," + dict["name"] + "," + dict["content"])\nelse:print("ERROR(" + str(data["errors"][0]["code"]) + "): " + data["errors"][0]["message"])' > $TMPFILE
 
             if [ $(wc -l < $TMPFILE) -gt 0 ]; then
                 printf "\nFound %s existing DNS record(s) whose type is '%s' named '%s'\n" $(wc -l < $TMPFILE) "$TYPE" "$NAME"
@@ -370,19 +375,19 @@ EOF
         fi
 
         if [ $TYPE == "A" ] || [  $TYPE == "AAAA" ] || [ $TYPE == "CNAME" ]; then
-            curl ${REQUEST[@]/#/-X} \
+            curl $MODE ${REQUEST[@]/#/-X} \
             "${AUTH_HEADERS[@]/#/-H}" \
             -H "Content-Type: application/json" \
             --data '{"type":"'"$TYPE"'","name":"'"$NAME"'","content":"'"$CONTENT"'","proxied":'"$PROXIED"',"ttl":'"$TTL"'}' \
             | python3 -m json.tool --sort-keys
         elif [ $TYPE == "MX" ]; then
-            curl ${REQUEST[@]/#/-X} \
+            curl $MODE ${REQUEST[@]/#/-X} \
             "${AUTH_HEADERS[@]/#/-H}" \
             -H "Content-Type: application/json" \
             --data '{"type":"'"$TYPE"'","name":"'"$NAME"'","content":"'"$CONTENT"'","priority":'"$PRIORITY"',"ttl":'"$TTL"'}' \
             | python3 -m json.tool --sort-keys
         else
-            curl ${REQUEST[@]/#/-X} \
+            curl $MODE ${REQUEST[@]/#/-X} \
             "${AUTH_HEADERS[@]/#/-H}" \
             -H "Content-Type: application/json" \
             --data '{"type":"'"$TYPE"'","name":"'"$NAME"'","content":"'"$CONTENT"'","ttl":'"$TTL"'}' \
@@ -407,7 +412,7 @@ EOF
 
                 printf "\nDeleteing the $RECORD\n"      
 
-                curl -X DELETE "https://api.cloudflare.com/client/v4/zones/$ZONE_ID/dns_records/$DNS_ID" \
+                curl $MODE -X DELETE "https://api.cloudflare.com/client/v4/zones/$ZONE_ID/dns_records/$DNS_ID" \
                 "${AUTH_HEADERS[@]/#/-H}" \
                 -H "Content-Type: application/json" \
                 | python3 -m json.tool --sort-keys
