@@ -420,8 +420,8 @@ Proxiable: False
 Proxied: False
 TTL: 3600
 Modified: 2020-09-17T11:18:19.583054Z
-./cf-dns.sh -d example.com -t MX -n example.com -c aspmx.l.google.com -p 5 -l 3600 [-k]
-./cf-dns.sh -d example.com -t MX -n example.com -c aspmx.l.google.com -Z [-a] [-k] 
+./cf-dns.sh -d example.com -t MX -n example.com -c aspmx.l.google.com -p 5 -l 3600 [-k] [-s] [-A]
+./cf-dns.sh -d example.com -t MX -n example.com -c aspmx.l.google.com -Z [-a] [-k] [-s]
 
 * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
 
