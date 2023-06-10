@@ -27,7 +27,7 @@
     fi
 
 # Unset all variables
-    unset ANSWER APIKEY AUTH_HEADERS AUTO CONTENT DELETE DNS_ID DOMAIN EMAIL KEY MODE NAME OVERRIDE PRIORITY PROXIED RECORD REQUEST RESPONSE TMPFILE TOKEN TTL TYPE ZONE_ID 
+    unset ANSWER APIKEY AUTO CONTENT DELETE DNS_ID DOMAIN HEADER_EMAIL HEADER_KEY HEADER_TOKEN EMAIL KEY MODE NAME OVERRIDE PRIORITY PROXIED RECORD REQUEST RESPONSE TMPFILE TOKEN TTL TYPE ZONE_ID 
 
 
 
@@ -45,7 +45,9 @@ TOKEN=$(cat ./auth.json | python3 -c "import sys, json; print(json.load(sys.stdi
 # DEFAULTS
 #
 
-AUTH_HEADERS=( "Authorization: Bearer $TOKEN" )
+HEADER_TOKEN="Bearer $TOKEN"
+HEADER_EMAIL=""                 # When using a Cloudlare API token to authenticate, this legacy API key credential is included in the request as an empty X-Auth-Email header (--header 'X-Auth-Email: '), but ultimately ignored by curl
+HEADER_KEY=""                   # When using a Cloudlare API token to authenticate, this legacy API key credential is included in the request as an empty X-Auth-Key header (--header 'X-Auth-Key: '), but ultimately ignored by curl
 MODE="--silent"
 #PRIORITY="5"
 #PROXIED="true"
@@ -267,8 +269,10 @@ EOF
     fi 
 
 # Use legacy API key to authenticate instead of API token
-    if [ ! -z "$APIKEY" ]; then 
-        AUTH_HEADERS=( "X-Auth-Email: $EMAIL" "X-Auth-Key: $KEY" )
+    if [ ! -z "$APIKEY" ]; then
+        HEADER_TOKEN=""                 # # When using a Cloudlare legacy API key to authenticate, the API token is included in the request as as an empty Authorization header (--header 'Authorization: '), but ultimately ignored by curl
+        HEADER_EMAIL="$EMAIL"
+        HEADER_KEY="$KEY"
     fi  
 
 # Append domain name to supplied DNS record name. Ensures that all DNS records are managed using their correct naming convention: 'www.example.com' as opposed to 'www' 
@@ -286,10 +290,13 @@ EOF
 
 # Get the domain's zone ID
     printf "\nAttempting to get zone ID for domain '%s'\n" $DOMAIN
+
     ZONE_ID=$(
         curl $MODE -X GET "https://api.cloudflare.com/client/v4/zones?name=$DOMAIN" \
-        "${AUTH_HEADERS[@]/#/-H}" \
-        -H "Content-Type: application/json" \
+        --header "Authorization: $HEADER_TOKEN" \
+        --header "X-Auth-Email: $HEADER_EMAIL" \
+        --header "X-Auth-Key: $HEADER_KEY" \
+        --header "Content-Type: application/json" \
         | python3 -c "import sys,json;data=json.loads(sys.stdin.read()); print(data['result'][0]['id'] if data['result'] else '')"
     ) 
 
@@ -302,11 +309,17 @@ EOF
     
 # Get the DNS record's ID based on type, name and content
     printf "\nAttempting to get ID for DNS '%s' record named '%s' whose content is '%s'\n" "$TYPE" "$NAME" "$CONTENT"
+
     DNS_ID=$(
-        curl $MODE -G "https://api.cloudflare.com/client/v4/zones/$ZONE_ID/dns_records" --data-urlencode "type=$TYPE" --data-urlencode "name=$NAME" --data-urlencode "content=$CONTENT" \
-        "${AUTH_HEADERS[@]/#/-H}" \
-        -H "Content-Type: application/json" \
+        curl $MODE -G "https://api.cloudflare.com/client/v4/zones/$ZONE_ID/dns_records" \
+        --data-urlencode "type=$TYPE" \
+        --data-urlencode "name=$NAME" \
+        --data-urlencode "content=$CONTENT" \
+        --header "Authorization: $HEADER_TOKEN" \
+        --header "X-Auth-Email: $HEADER_EMAIL" \
+        --header "X-Auth-Key: $HEADER_KEY" \
         | python3 -c "import sys,json;data=json.loads(sys.stdin.read()); print(data['result'][0]['id'] if data['result'] else '')"
+
     )
 
     if [ -z "$DNS_ID" ]; then
@@ -324,9 +337,15 @@ EOF
             TMPFILE=$(mktemp)
 
             printf "\nAttempting to get all DNS records whose type is '%s' named '%s'\n" "$TYPE" "$NAME"
-            curl $MODE -G "https://api.cloudflare.com/client/v4/zones/$ZONE_ID/dns_records" --data-urlencode "type=$TYPE" --data-urlencode "name=$NAME" \
-            "${AUTH_HEADERS[@]/#/-H}" \
+
+            curl $MODE -G "https://api.cloudflare.com/client/v4/zones/$ZONE_ID/dns_records" \
+            --data-urlencode "type=$TYPE" \
+            --data-urlencode "name=$NAME" \
+            --header "Authorization: $HEADER_TOKEN" \
+            --header "X-Auth-Email: $HEADER_EMAIL" \
+            --header "X-Auth-Key: $HEADER_KEY" \
             | python3 -c $'import sys,json\ndata=json.loads(sys.stdin.read())\nif data["success"]:\n\tfor dict in data["result"]:print(dict["id"] + "," + dict["type"] + "," + dict["name"] + "," + dict["content"])\nelse:print("ERROR(" + str(data["errors"][0]["code"]) + "): " + data["errors"][0]["message"])' > $TMPFILE
+
 
             if [ $(wc -l < $TMPFILE) -gt 0 ]; then
                 printf "\nFound %s existing DNS record(s) whose type is '%s' named '%s'\n" $(wc -l < $TMPFILE) "$TYPE" "$NAME"
@@ -366,30 +385,38 @@ EOF
 
         if [ -z "$DNS_ID" ]; then
         # DNS record doesn't exist. Create a new one.
-            REQUEST=("POST https://api.cloudflare.com/client/v4/zones/$ZONE_ID/dns_records/")
+            REQUEST_TYPE="POST"
+            REQUEST_URL="https://api.cloudflare.com/client/v4/zones/$ZONE_ID/dns_records/"
             printf "\nAdding new DNS '%s' record named '%s'\n" $TYPE $NAME
         else
         # DNS record already exists. Update the existing record.
-            REQUEST=("PUT https://api.cloudflare.com/client/v4/zones/$ZONE_ID/dns_records/$DNS_ID")
+            REQUEST_TYPE="PATCH" 
+            REQUEST_URL="https://api.cloudflare.com/client/v4/zones/$ZONE_ID/dns_records/$DNS_ID"
             printf "\nUpdating existing DNS '%s' record named '%s'\n" $TYPE $NAME
         fi
 
         if [ $TYPE == "A" ] || [  $TYPE == "AAAA" ] || [ $TYPE == "CNAME" ]; then
-            curl $MODE ${REQUEST[@]/#/-X} \
-            "${AUTH_HEADERS[@]/#/-H}" \
-            -H "Content-Type: application/json" \
+            curl $MODE -X "$REQUEST_TYPE" "$REQUEST_URL" \
+            --header "Authorization: $HEADER_TOKEN" \
+            --header "X-Auth-Email: $HEADER_EMAIL" \
+            --header "X-Auth-Key: $HEADER_KEY" \
+            --header "Content-Type: application/json" \
             --data '{"type":"'"$TYPE"'","name":"'"$NAME"'","content":"'"$CONTENT"'","proxied":'"$PROXIED"',"ttl":'"$TTL"'}' \
             | python3 -m json.tool --sort-keys
         elif [ $TYPE == "MX" ]; then
-            curl $MODE ${REQUEST[@]/#/-X} \
-            "${AUTH_HEADERS[@]/#/-H}" \
-            -H "Content-Type: application/json" \
+            curl $MODE -X "$REQUEST_TYPE" "$REQUEST_URL" \
+            --header "Authorization: $HEADER_TOKEN" \
+            --header "X-Auth-Email: $HEADER_EMAIL" \
+            --header "X-Auth-Key: $HEADER_KEY" \
+            --header "Content-Type: application/json" \
             --data '{"type":"'"$TYPE"'","name":"'"$NAME"'","content":"'"$CONTENT"'","priority":'"$PRIORITY"',"ttl":'"$TTL"'}' \
             | python3 -m json.tool --sort-keys
         else
-            curl $MODE ${REQUEST[@]/#/-X} \
-            "${AUTH_HEADERS[@]/#/-H}" \
-            -H "Content-Type: application/json" \
+            curl $MODE -X "$REQUEST_TYPE" "$REQUEST_URL" \
+            --header "Authorization: $HEADER_TOKEN" \
+            --header "X-Auth-Email: $HEADER_EMAIL" \
+            --header "X-Auth-Key: $HEADER_KEY" \
+            --header "Content-Type: application/json" \
             --data '{"type":"'"$TYPE"'","name":"'"$NAME"'","content":"'"$CONTENT"'","ttl":'"$TTL"'}' \
             | python3 -m json.tool --sort-keys
         fi 
@@ -409,14 +436,13 @@ EOF
             fi
             
             if [[ "$RESPONSE" =~ ^([yY][eE][sS]|[yY])$ ]]; then
-
                 printf "\nDeleteing the $RECORD\n"      
-
                 curl $MODE -X DELETE "https://api.cloudflare.com/client/v4/zones/$ZONE_ID/dns_records/$DNS_ID" \
-                "${AUTH_HEADERS[@]/#/-H}" \
-                -H "Content-Type: application/json" \
+                --header "Authorization: $HEADER_TOKEN" \
+                --header "X-Auth-Email: $HEADER_EMAIL" \
+                --header "X-Auth-Key: $HEADER_KEY" \
+                --header "Content-Type: application/json" \
                 | python3 -m json.tool --sort-keys
-
             else
                 printf "\nThe $RECORD has NOT been deleted.\n"
             fi
