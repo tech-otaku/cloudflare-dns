@@ -15,10 +15,10 @@ To view an existing domain's current DNS records see [Get an Existing Domain's C
 `./cf-dns.sh -h`
 
 #### Add or Update
-`./cf-dns.sh -d DOMAIN -n NAME -t TYPE -c CONTENT -p PRIORITY -l TTL -x PROXIED [-k] [-s] [-o] [-A]`
+`./cf-dns.sh -d DOMAIN -n NAME -t TYPE -c CONTENT [-p PRIORITY] [-x PROXIED] [-l TTL] [-C COMMENT] [-k] [-S] [-A]`
 
 #### Delete
-`./cf-dns.sh -d DOMAIN -n NAME -t TYPE -c CONTENT -Z [-a] [-k] [-s] [-o]`
+`./cf-dns.sh -d DOMAIN -n NAME -t TYPE -c CONTENT -Z [-a] [-k] [-S]`
 
 ## Options
 
@@ -26,41 +26,36 @@ Use `./cf-dns.sh -h` to see an explanation of the options and their usage.
 
 In addition, please note the following:
 
-- When adding a new DNS record or updating an existing one, all but the `-k` and `-o` options are required.<sup>**1**</sup> This is true even when updating an existing DNS record where not all the data is changing. 
+---
 
-    For example, to change only the content (`-c CONTENT`) for this record to `198.51.100.54` all data needs to be given:
+- The scipt always requires the options *domain* (`-d DOMAIN `), *type* (`-t TYPE`), *name* (`-n NAME`) and *content* (`-c CONTENT`).
 
-    | Type | Name            | Content      | Priority | TTL  | Proxy status  |
-    |:-----|:----------------|:-------------|:---------|:-----|:--------------|
-    | A    | example.com     | 203.0.113.50 | N/A      | Auto | Proxied       |
+- For new MX records, *priority* (`-p PRIORITY`) is required, but will be defaulted to `10` by the script if omitted.
 
-    <br />
+- When updating existing records the script now uses the `PATCH` method of the Cloudflare API instead of `PUT` meaning that, in addition to the mandatory options, **only** the data being updated need be passed to the script. 
 
-    `./cf-dns.sh -d example.com -t A -n example.com -c 198.51.100.54 -l 1 -x y`
-    
-    <br />
+- *Proxy status* (`-x PROXIED`) is not required for `MX` or `TXT` records as these DNS record types can not be proxied through Cloudflare. When creating `A`, `AAAA` or `CNAME` records, the Cloudflare API defaults the *proxy status* to `false` if omitted.
 
-    | Type | Name            | Content      | Priority | TTL  | Proxy status  |
-    |:-----|:----------------|:-------------|:---------|:-----|:--------------|
-    | A    | example.com     | ***198.51.100.54*** | N/A      | Auto | Proxied       |
+- *TTL* (`-l TTL`) can only be set to one of the following values:
 
-    <br />
+    | `-l TTL` | TTL        |
+    |----------|------------|
+    | `1`      | Auto       |
+    | `60`     | 1 minute   |
+    | `120`    | 2 minutes  |
+    | `300`    | 5 minutes  |
+    | `600`    | 10 minutes |
+    | `900`    | 15 minutes |
+    | `1800`   | 30 minutes |
+    | `3600`   | 1 hour     |
+    | `7200`   | 2 hours    |
+    | `18000`  | 5 hours    |
+    | `43200`  | 12 hours   |
+    | `86400`  | 1 day      |
 
-    <sup>**1**</sup> When using the `-Z` option to delete a record, the only mandatory options are domain (`-d DOMAIN`), name (`-n NAME`), type (`-t TYPE`) and content (`-c CONTENT`). Optionally, use `-a` to suppress the prompt asking to confirm deletion.
+    If a DNS record's **Proxy status** (`-x PROXIED`) is _Proxied_ (`true`), its TTL will be set to `1` automtically by the Cloudflare API regardless of the value passed to the script. This is due to Cloudflare only allowing TTL values other than `1` for DNS records that are not proxied.
 
-- Priority (`-p PRIORITY`) is only required for `MX` type DNS records and is ignored for all other DNS record types.
-
-    <br />  
-
-- Proxied status (`-x PROXIED`) is not required for `MX` or `TXT` type DNS records and is ignored if specified. These DNS record types can not be proxied through Cloudflare.
-
-    <br />  
-
-- When specifying a TTL (`-l TTL`) other than `1` (Auto), the DNS record's proxy status will be automatically set to `DNS only` regardless of the value of `-x`. This is due to Cloudflare only allowing TTL values other than `1` for DNS records that are *not* proxied.
-
-    <br />  
-
-- The script checks if the domain name (`-d DOMAIN`) and DNS record name (`-n NAME`) are the same. If not, the domain name is appended to the DNS record name as per the table below (think `dig TXT example.com` and `dig TXT dkim._domainkey.example.com`). The `-o` option overrides this behaviour, but I can't recall why I initially included it. If used, the option is ignored and will be removed at a later date. 
+- The script checks if the domain name (`-d DOMAIN`) and DNS record name (`-n NAME`) are the same. If not, the domain name is appended to the DNS record name as per the table below (think `dig TXT example.com` and `dig TXT dkim._domainkey.example.com`).
 
     | TYPE  | DOMAIN      | NAME                | REFERENCED AS                   |
     |:------|:------------|:--------------------|:--------------------------------|
@@ -81,7 +76,9 @@ In addition, please note the following:
 
     `./cf-dns.sh -d example.com -t TXT -n _dmarc -c "v=DMARC1; p=none; pct=100; rua=mailto:$MAILTO; sp=none; aspf=r;" -l 1`
 
+- A double `"` quote *contained* in a Comment [`-C COMMENT`] is replaced with a single `'` quote by the script to avoid the error `{"code":9207,"message":"Request body is invalid."}`. 
 
+- As Cloudflare only allows a maximum Comment [`-C COMMENT`] length of 100 characters, the script truncates them to 97 characters and prepends `...` .  
 
 ## Authentication
 
@@ -109,17 +106,17 @@ The script helps streamline this process by not needing to know the zone ID and 
 
 Consider the following DNS records for the `example.com` domain: 
 
-| # | Type  | Name            | Content                              | Priority | TTL  |Proxy    | 
-|---|-------|-----------------|--------------------------------------|----------|------|---------|
-| 1 | A     | example.com     | 203.0.113.50                         | N/A      |Auto  | Proxied  | 
-| ***2*** | ***AAAA***  | ***example.com***     | ***2001:db8:c010:46d6::1***                | ***N/A***      |***Auto*** | ***Proxied***  |
-| 3 | CNAME | www             | example.com                          | N/A      |Auto  | Proxied  |
-| 4 | MX    | example.com     | aspmx.l.google.com                   | 5        | 3600 | DNS only |
-| 5 | MX    | example.com     | alt2.aspmx.l.google.com              | 5        | 3600 | DNS only |
-| ***6*** | ***MX***    | ***example.com***     | ***mail.example.com***                     | ***5***       | ***Auto*** | ***DNS only*** |
-| 7 | TXT   | dkim._domainkey | v=DKIM1; p=MFswDQYJKoZIhvXjTSNCGv... | N/A      | Auto | DNS only |
-| 8 | TXT   | _dmarc          | v=DMARC1; p=quarantine; pct=75; r... | N/A      | Auto | DNS only |
-| 9 | TXT   | example.com     | v=spf1 mx ~all                       | N/A      | Auto | DNS only |
+| #       | Type       | Comment               | Name              | Content                              | Priority  | Proxy          | TTL        |   
+|---------|------------| ----------------------|-------------------|--------------------------------------|-----------|----------------|------------| 
+| 1       | A          | 'A' Record            | example.com       | 203.0.113.50                         | N/A       | DNS Only       | Auto       |
+| ***2*** | ***AAAA*** | ***'AAAA' Record***   | ***example.com*** | ***2001:db8:c010:46d6::1***          | ***N/A*** | ***Proxied***  | ***Auto*** |
+| 3       | CNAME      | 'CNAME' Record        | www               | example.com                          | N/A       | Proxied        | Auto       |
+| 4       | MX         | 1st 'MX' Record       | example.com       | alt2.aspmx.l.google.com              | 10        | DNS only       | Auto       |
+| 5       | MX         | 2nd 'MX' Record       | example.com       | aspmx.l.google.com                   | 10        | DNS only       | Auto       |
+| ***6*** | ***MX***   | ***3rd 'MX' Record*** | ***example.com*** | ***mail.example.com***               | ***20***  | ***DNS only*** | ***1hr***  |
+| 7       | TXT        | 'DKIM' Record         | dkim._domainkey   | v=DKIM1; p=MFswDQYJKoZIhvc...        | N/A       | DNS only       | Auto       |
+| 8       | TXT        | 'DMARC' Record        | _dmarc            | v=DMARC1; p=none; pct=100; r...      | N/A       | DNS only       | Auto       | 
+| 9       | TXT        | 'SPF' Record          | example.com       | v=spf1 mx ~all                       | N/A       | DNS only       | Auto       |
 
 To demonstrate how the script works, let's assume that neither the **AAAA** record (#2) nor the **MX** record pointing to **mail.example.com** (#6) exist.
 
@@ -127,7 +124,7 @@ To demonstrate how the script works, let's assume that neither the **AAAA** reco
 
 To attempt to add the **AAAA** record with the script I use:
 
-`./cf-dns.sh -d example.com -t AAAA -n example.com -c 2001:db8:c010:46d6::1 -l 1 -x y`
+`./cf-dns.sh -d example.com -t AAAA -n example.com -c 2001:db8:c010:46d6::1 -x y -l 1 -C "'AAAA' Record"`
 
 The script executes these steps:
 
@@ -140,7 +137,7 @@ The script executes these steps:
 
 To attempt to add the **MX** record with the script I use:
 
-`./cf-dns.sh -d example.com -t MX -n example.com -c mail.example.com -p 5 -l 1`
+`./cf-dns.sh -d example.com -t MX -n example.com -c mail.example.com -p 20 -x N -l 3600 -C "3rd 'MX' Record"`
 
 As with the previous example, the script executes steps 1 to 2. However, on executing step 3 it finds two existing records (#4 and #5) that match type (`-t TYPE`) and name (`-n NAME`) and so displays the following interactive prompt:
 
@@ -157,17 +154,17 @@ As I want to add a new DNS record, I type `A` and press enter and a new DNS reco
 
 ---
 
-Having created this new **MX** record, I decide to change the *Priority* from **5** to **10** using:
+Having created this new **MX** record, I decide to change the *Priority* from **20** to **15** using:
 
-`./cf-dns.sh -d example.com -t MX -n example.com -c mail.example.com -p 10 -l 1`
+`./cf-dns.sh -d example.com -t MX -n example.com -c mail.example.com -p 15`
 
-On this occasion, when executing step 2, the script finds the single existing record that matches type (`-t TYPE`), name (`-n NAME`) and content (`-c CONTENT`) and simply changes its priority to `10`.
+On this occasion, when executing step 2, the script finds the single existing record that matches type (`-t TYPE`), name (`-n NAME`) and content (`-c CONTENT`) and simply changes its priority to `15`.
 
 ---
 
 Later I realise I've made a mistake. This new **MX** record should point to **mail.example.net** and not **mail.example.com**. To change its *Content* I use:
 
-`./cf-dns.sh -d example.com -t MX -n example.com -c mail.example.net -p 10 -l 1`
+`./cf-dns.sh -d example.com -t MX -n example.com -c mail.example.net`
 
 On executing step 3 the script now finds three existing records (#4, #5 and #6) that match type (`-t TYPE`) and name (`-n NAME`) and so displays the following interactive prompt:
 
@@ -196,183 +193,164 @@ To delete the **MX** record now pointing to **mail.example.net** use:
 
 #### Add New DNS Records
 
-`./cf-dns.sh -d example.com -t A -n example.com -c 203.0.113.50 -l 1 -x y`
+`./cf-dns.sh -d example.com -t A -n example.com -c 203.0.113.50 -x N -l 1 -C "'A' Record"`
+
+| Type | Comment    | Name        | Content      | Priority | Proxy status | TTL  |
+| ---- | ---------- | ----------- | ------------ | -------- | ------------ | ---- |
+| A    | 'A' Record | example.com | 203.0.113.50 | N/A      | DNS Only     | Auto |
 
 <br />
 
-| Type | Name            | Content      | Priority | TTL  | Proxy status  |
-|:-----|:----------------|:-------------|:---------|:-----|:--------------|
-| A    | example.com     | 203.0.113.50 | N/A      | Auto | Proxied       |
+:point_right: As Cloudflare defaults **Proxy status** to _DNS Only_ (`false`) and **TTL** to _Auto_ (`1`), the following are functionally equivalent:
+
+`./cf-dns.sh -d example.com -t A -n example.com -c 203.0.113.50 -x N -C "'A' Record"`
+
+`./cf-dns.sh -d example.com -t A -n example.com -c 203.0.113.50 -l 1 -C "'A' Record"`
+
+`./cf-dns.sh -d example.com -t A -n example.com -c 203.0.113.50 -C "'A' Record"`
 
 ---
 
-<br />
+`./cf-dns.sh -d example.com -t AAAA -n example.com -c 2001:db8:c010:46d6::1 -x y -l 1 -C "'AAAA' Record"` 
 
-`./cf-dns.sh -d example.com -t CNAME -n www -c example.com -l 1 -x y`
-
-<br />
-
-| Type  | Name | Content         | Priority | TTL  | Proxy status  |
-|:------|:-----|:----------------|:---------|:-----|:--------------|
-| CNAME | www  | example.com     | N/A      | Auto | DNS only      |
+| Type | Comment      | Name        | Content               | Priority | Proxy status   | TTL  |
+|------|------------- |-------------|-----------------------|----------|----------------|------|
+| AAAA |'AAAA' Record | example.com | 2001:db8:c010:46d6::1 | N/A      | Proxied        | Auto |
 
 ---
 
+`./cf-dns.sh -d example.com -t CNAME -n www -c example.com -x Y -l 120 -C "'CNAME' Record"`
+
+| Type  | Comment        | Name | Content     | Priority | Proxy status | TTL  |
+| ----- | -------------- | ---- | ----------- | -------- | ------------ | ---- |
+| CNAME | 'CNAME' Record | www  | example.com | N/A      | Proxied      | Auto |
+
 <br />
 
-`./cf-dns.sh -d example.com -t AAAA -n example.com -c 2001:db8:c010:46d6::1 -l 1 -x y` 
-
-<br />
-
-| Type | Name            | Content               | Priority | TTL   | Proxy status   |
-|:-----|:----------------|:----------------------|:---------|:------|:---------------|
-| AAAA | example.com     | 2001:db8:c010:46d6::1 | N/A      | Auto  | Proxied        |
+:point\_right: Despite attempting to set the **TTL** to _2 min_ (`120`), the script forces a **TTL** of _Auto_ (`1`) as Cloudflare only allows records with a **Proxy status** of _DNS Only_ (`false`) to have a **TTL** other than _Auto_ (`1`). 
 
 ---
 
-<br />
+`./cf-dns.sh -d example.com -t MX -n example.com -c alt2.aspmx.l.google.com -p 10 -l 1 -C "1st 'MX' Record"`
 
-`./cf-dns.sh -d example.com -t MX -n example.com -c aspmx.l.google.com -p 5 -l 1 -k`
-
-<br />
-
-NOTE: This example uses the legacy API key (`-k`) to authenticate.
+| Type | Comment           | Name        | Content                 | Priority | Proxy status | TTL  |
+| ---- | ----------------- | ----------- | ----------------------- | -------- | ------------ | ---- |
+| MX   | 1st 'MX' Record   | example.com | alt2.aspmx.l.google.com | 10       | DNS Only     | Auto |
 
 <br />
 
-| Type | Name            | Content            | Priority | TTL  | Proxy status  |
-|:-----|:----------------|:-------------------|:---------|:-----|:--------------|
-| MX   | example.com     | aspmx.l.google.com | 5        | Auto | DNS only      |
+:point_right: As the script defaults **Priority** to _10_ and Cloudflare defaults **TTL** to _Auto_ (`1`), the following are functionally equivalent:
+
+`./cf-dns.sh -d example.com -t MX -n example.com -c alt2.aspmx.l.google.com -p 10 -C "1st 'MX' Record"`
+
+`./cf-dns.sh -d example.com -t MX -n example.com -c alt2.aspmx.l.google.com -l 1 -C "1st 'MX' Record"`
+
+`./cf-dns.sh -d example.com -t MX -n example.com -c alt2.aspmx.l.google.com -C "1st 'MX' Record"`
 
 ---
 
-<br />
+`./cf-dns.sh -d example.com -t MX -n example.com -c aspmx.l.google.com -C "2nd 'MX' Record"`
 
-`./cf-dns.sh -d example.com -t TXT -n dkim._domainkey -c 'v=DKIM1; p=MFswDQYJKoZIhvcNAQEBBQADSgAwRwJAXemJxxGR7kgbyS2FK8FOtCxAgPHW9mA7SCcHK77dWM2wBTZyKRxd7eJARaaWHS1B4CxDdWh02Eqy7mygwUwZSwIDAQAB' -l 1`
-
-<br />
-
-| Type | Name            | Content                       | Priority | TTL  | Proxy status  |
-|:-----|:----------------|:------------------------------|:---------|:-----|:--------------|
-| TXT  | dkim._domainkey | v=DKIM1; p=MFswDQYJKoZIhvc... | N/A      | Auto | DNS only      |
+| Type | Comment           | Name        | Content            | Priority | Proxy status | TTL  |
+| ---- | ----------------- | ----------- | ------------------ | -------- | ------------ | ---- |
+| MX   | 1st 'MX' Record   | example.com | aspmx.l.google.com | 10       | DNS Only     | Auto |
 
 ---
 
-<br />
+`./cf-dns.sh -d example.com -t TXT -n dkim._domainkey -c 'v=DKIM1; p=MFswDQYJKoZIhvcNAQEBBQADSgAwRwJAXemJxxGR7kgbyS2FK8FOtCxAgPHW9mA7SCcHK77dWM2wBTZyKRxd7eJARaaWHS1B4CxDdWh02Eqy7mygwUwZSwIDAQAB' -l 1 -C "'DKIM' Record"` 
 
-`./cf-dns.sh -d example.com -t TXT -n _dmarc -c 'v=DMARC1; p=none; pct=100; rua=mailto:postmaster@mail.example.net; sp=none; aspf=r;' -l 1`
-
-<br />
-
-| Type | Name   | Content                         | Priority | TTL  | Proxy status  |
-|:-----|:-------|:--------------------------------|:---------|:-----|:--------------|
-| TXT  | _dmarc | v=DMARC1; p=none; pct=100; r... | N/A      | Auto | DNS only      |
+| Type | Comment       | Name            | Content                       | Priority | Proxy status | TTL  |
+| ---- | ------------- | --------------- | ----------------------------- | -------- | ------------ | ---- |
+| TXT  | 'DKIM' Record | dkim._domainkey | v=DKIM1; p=MFswDQYJKoZIhvc... | N/A      | DNS only     | Auto |
 
 ---
 
-<br />
+`./cf-dns.sh -d example.com -t TXT -n _dmarc -c 'v=DMARC1; p=none; pct=100; rua=mailto:postmaster@mail.example.net; sp=none; aspf=r;' -l 1 -C "'DMARC' Record" -k` 
 
-`./cf-dns.sh -d example.com -t TXT -n example.com -c 'v=spf1 mx ~all' -l 1`
+| Type | Comment        | Name   | Content                         | Priority | Proxy status | TTL  |
+| ---- | -------------- | ------ | ------------------------------- | -------- | ------------ | ---- |
+| TXT  | 'DMARC' Record | _dmarc | v=DMARC1; p=none; pct=100; r... | N/A      | DNS only     | Auto |
 
-<br />
-
-| Type | Name            | Content        | Priority | TTL  | Proxy status  |
-|------|-----------------|----------------|----------|------|---------------|
-| TXT  | example.com     | v=spf1 mx ~all | N/A      | Auto | DNS only      |
+:point\_right: This example uses the legacy API key (`-k`) to authenticate.
 
 ---
 
+`./cf-dns.sh -d example.com -t TXT -n example.com -c "v=spf1 mx ~all" -x Y -l 1 -C "'SPF' Record"`
+
+| Type | Comment      | Name        | Content        | Priority | Proxy status | TTL  |
+| ---- | ------------ | ----------- | -------------- | -------- | ------------ | ---- |
+| TXT  | 'SPF' Record | example.com | v=spf1 mx ~all | N/A      | DNS Only     | Auto |
+
 <br />
+
+:point_right: Despite attempting to set the **Proxy status** to _Proxied_ (`true`), the script does not include this in the payload as MX and TXT records are not proxiable on Cloudflare which forces **Proxy status** to _DNS Only_ (`false`) for these record types.
+
+---
+
 
 #### Update Existing DNS Records
 
-`./cf-dns.sh -d example.com -t A -n example.com -c 198.51.100.54 -l 1 -x y`
+`./cf-dns.sh -d example.com -t A -n example.com -c 198.51.100.54`
 
-<br />
-
-| Type | Name            | Content        | Priority | TTL  | Proxy status  |
-|:-----|:----------------|:---------------|:---------|:-----|:--------------|
-| A    | example.com     | ***198.51.100.54*** | N/A      | Auto | Proxied       |
+| Type | Comment    | Name        | Content             | Priority | Proxy status | TTL  |
+| ---- | ---------- | ----------- | ------------------- | -------- | ------------ | ---- |
+| A    | 'A' Record | example.com | _**198.51.100.54**_ | N/A      | DNS Only     | Auto |
 
 ---
 
-<br />
+`./cf-dns.sh -d example.com -t AAAA -n example.com -c 2001:db8:c010:46d6::1 -x n`
 
-`./cf-dns.sh -d example.com -t CNAME -n www -c example.com -l 300 -x n`
-
-<br />
-
-| Type  | Name | Content         | Priority | TTL   | Proxy status  |
-|:------|:-----|:----------------|:---------|:------|:--------------|
-| CNAME | www  | example.com     | N/A      | ***5 min*** | ***DNS only***      |
+| Type | Comment       | Name        | Content               | Priority | Proxy status   | TTL  |
+| ---- | ------------- | ----------- | --------------------- | -------- | -------------- | ---- |
+| AAAA | 'AAAA' Record | example.com | 2001:db8:c010:46d6::1 | N/A      | _**DNS only**_ | Auto |
 
 ---
 
+`./cf-dns.sh -d example.com -t CNAME -n www -c example.com -C "Cloudflare truncates comments longer than 100 characters, and doesn't support record tags on its free plan."` 
+
+| Type  | Comment                                                                                                    | Name | Content     | Priority | Proxy status | TTL  |
+| ----- | ---------------------------------------------------------------------------------------------------------- | ---- | ----------- | -------- | ------------ | ---- |
+| CNAME | _**Cloudflare truncates comments longer than 100 characters, and doesn't support record tags on its ...**_ | www  | example.com | N/A      | Proxied      | Auto |
+
 <br />
 
-`./cf-dns.sh -d example.com -t AAAA -n example.com -c 2001:db8:c010:46d6::1 -l 1 -x n`
-
-<br />
-
-| Type | Name            | Content               | Priority | TTL   | Proxy status   |
-|:-----|:----------------|:----------------------|:---------|:------|:---------------|
-| AAAA | example.com     | 2001:db8:c010:46d6::1 | N/A      | Auto  | ***DNS only***       |
+:point_right: As Cloudflare only allows comments upto a maximum of 100 characters, the script truncates comments longer than 97 characters and prepends them with `...`.
 
 ---
 
-<br />
+`./cf-dns.sh -d example.com -t MX -n example.com -c mail.example.com -p 15 -l 3600`
 
-`./cf-dns.sh -d example.com -t MX -n example.com -c alt1.aspmx.l.google.com -p 10 -l 1`
-
-<br />
-
-| Type | Name            | Content                 | Priority | TTL  | Proxy status  |
-|:-----|:----------------|:------------------------|:---------|:-----|:--------------|
-| MX   | example.com     | ***alt1.aspmx.l.google.com*** | ***10***        | Auto | DNS only      |
+| Type | Comment           | Name        | Content          | Priority | Proxy status | TTL        |
+| ---- | ----------------- | ----------- | ---------------- | -------- | ------------ | ---------- |
+| MX   | First 'MX' Record | example.com | mail.example.com | _**15**_ | DNS Only     | _**1 hr**_ |
 
 ---
-
-<br />
 
 `./cf-dns.sh -d veward.com -t TXT -n dkim._domainkey -c 'v=DKIM1; p=MFswDQYJKoZIhvcNAQEBBQADSgAwRwJAYWXi4K8r0xVWXeY5b7nXrdO24E1Yd7bv /mNIGcR0FlHdf2Ng3gO1fzAq/x/ae2PIhG1TEj2+mh1BVK1u2oc7/wIDAQAB' -l 1`
 
-<br />
-
-| Type | Name            | Content                       | Priority | TTL  | Proxy status  |
-|:-----|:----------------|:------------------------------|:---------|:-----|:--------------|
-| TXT  | dkim._domainkey | v=DKIM1; p=***MFswDQYJKoZIhvc...*** | N/A      | Auto | DNS only      |
+| Type | Name            | Content                             | Priority | Proxy status | TTL  |
+| ---- | --------------  | ----------------------------------- | -------- | ------------ | ---- |
+| TXT  | dkim._domainkey | v=DKIM1; p=_**MFswDQYJKoZIhvc...**_ | N/A      | DNS only     | Auto |
 
 ---
-
-<br />
 
 `./cf-dns.sh -d example.com -t TXT -n _dmarc -c 'v=DMARC1; p=quarantine; pct=75; rua=mailto:postmaster@mail.example.net; sp=reject; aspf=r;' -l 1`
 
-<br />
-
-| Type | Name   | Content                   | Priority | TTL  | Proxy status  |
-|:-----|:-------|:--------------------------|:---------|:-----|:--------------|
-| TXT  | _dmarc | v=DMARC1; p=***quarantine***; pct=***75***; r... | N/A      | Auto | DNS only      |
+| Type | Name   | Content                                          | Priority | Proxy status | TTL  |
+| ---- | ------ | ------------------------------------------------ | -------- | ------------ | ---- |
+| TXT  | _dmarc | v=DMARC1; p=_**quarantine**_; pct=_**75**_; r... | N/A      | DNS only     | Auto |
 
 ---
-
-<br />
 
 #### Delete Existing DNS Records
 
 `./cf-dns.sh -d example.com -t A -n example.com -c 203.0.113.50 -Z -a`
 
-<br />
+| Type | Name        | Content      | Priority | Proxy status | TTL  |
+| ---- | ----------- | ------------ | -------- | ------------ | ---- |
+| A    | example.com | 203.0.113.50 | N/A      | Proxied      | Auto |
 
-NOTE: This example uses the `-a` option which suppresses the prompt asking to confirm deletion.
-
-<br />
-
-| Type | Name            | Content      | Priority | TTL  | Proxy status  |
-|:-----|:----------------|:-------------|:---------|:-----|:--------------|
-| A    | example.com     | 203.0.113.50 | N/A      | Auto | Proxied       |
-
-<br />
+:point_right: This example uses the `-a` option which suppresses the prompt asking to confirm deletion.
 
 A DNS record to be deleted is only matched using the combined values of type (`-t TYPE`), name (`-n NAME`) and content (`-c CONTENT`). If no match is found, a second attempt using only type (`-t TYPE`), and name (`-n NAME`) is not made as it is when adding or updating a DNS record.
 
@@ -386,18 +364,22 @@ A DNS record to be deleted is only matched using the combined values of type (`-
 
 - Only **A**, **AAAA**, **CNAME**, **MX** and **TXT** type DNS records can be added, updated or deleted.
 
+- Does not support record tags as these are not available on Cloudflare's Free plan.
+
+- The script is unable to match a record using a combination of type (`-t TYPE`), name (`-n NAME`) and content (`-c CONTENT`) if the content contains a comma (`,`). While this appears to be an issue with the Cloudflare API, the script cannot currently delete DNS records whose content contains a comma (`,`) and may require user interaction to update such records.
+
 ## Get an Existing Domain's Current DNS Records
 
-`get-dns.py` is a script that gets all of an existing domain's current DNS records. For each DNS record it displays a sub-set of the data returned from the API call together with the arguments required to delete that record and create it using the `cf-dns.sh` script. It can optionally include all of the record's data as raw JSON. Output can be directed to a file or to the user's screen.
+`get-dns.py` is a script that gets all of an existing domain's current DNS records. For each DNS record it displays a sub-Set of the data returned from the API call together with the arguments required to delete that record and create it using the `cf-dns.sh` script. It can optionally include all of the record's data as raw JSON. Output can be directed to a file or to the user's screen.
 
 ### Usage
 `./get-dns.py -h/--help`
 
-`./get-dns.py -d/--domain DOMAIN [-k/--key] [-p/--pretty] [-r/--raw] [-s/--screen]`
+`./get-dns.py -d/--domain DOMAIN [-k/--key] [-p/--pretty] [-r/--raw] [-S/--Screen]`
 
 ### Example
 
-`./get-dns.py --domain=example.com --raw --screen`
+`./get-dns.py --domain=example.com --raw --Screen`
 
 ### Sample Output
 
@@ -406,7 +388,7 @@ A DNS record to be deleted is only matched using the combined values of type (`-
 
 Record: 4/7 
 
-{"content": "aspmx.l.google.com", "created_on": "2020-09-17T11:18:19.583054Z", "id": "7bdb2e46037df332e5abdd45f8f981f5",
+{"comment": "2nd 'MX' Record", "content": "aspmx.l.google.com", "created_on": "2020-09-17T11:18:19.583054Z", "id": "7bdb2e46037df332e5abdd45f8f981f5",
  "locked": false, "meta": {"auto_added": false, "managed_by_apps": false, "managed_by_argo_tunnel": false, "source": 
  "primary"}, "modified_on": "2020-09-17T11:18:19.583054Z", "name": "example.com", "priority": 5, "proxiable": false, 
  "proxied": false, "ttl": 3600, "type": "MX", "zone_id": "8b717207bcee4047af2e9dff95832996", "zone_name": "example.com"} 
@@ -419,9 +401,10 @@ Priority: 5
 Proxiable: False
 Proxied: False
 TTL: 3600
+Comment: 2nd 'MX' Record
 Modified: 2020-09-17T11:18:19.583054Z
-./cf-dns.sh -d example.com -t MX -n example.com -c aspmx.l.google.com -p 5 -l 3600 [-k] [-s] [-A]
-./cf-dns.sh -d example.com -t MX -n example.com -c aspmx.l.google.com -Z [-a] [-k] [-s]
+./cf-dns.sh -d example.com -t MX -n example.com -c aspmx.l.google.com -p 5 -l 3600 -C "2nd 'MX' Record" [-k] [-S] [-A]
+./cf-dns.sh -d example.com -t MX -n example.com -c aspmx.l.google.com -Z [-a] [-k] [-S]
 
 * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
 
