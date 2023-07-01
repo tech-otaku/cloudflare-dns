@@ -139,6 +139,7 @@ def main():
 
         """
         Available keys for 'record'
+            comment
             content
             created_on
             id
@@ -170,8 +171,11 @@ def main():
         proxied = str(record['proxied'])
         ttl = str(record['ttl'])
         modified = record['modified_on']
+        comment=''
+        if record['comment'] is not None:
+            comment = record['comment']
 
-        output += f'Domain: {domain}\nType: {record_type}\nName: {name}\nContent: {content}\n' + (f'Priority: {priority}\n' if 'priority' in record else '') + f'Proxiable: {proxiable}\nProxied: {proxied}\nTTL: {ttl}\nModified: {modified}\n'
+        output += f'Domain: {domain}\nType: {record_type}\nName: {name}\nContent: {content}\n' + (f'Priority: {priority}\n' if 'priority' in record else '') + f'Proxiable: {proxiable}\nProxied: {proxied}\nTTL: {ttl}\nComment: {comment}\nModified: {modified}\n'
 
         if record_type.upper() in ('A','AAAA','CNAME','MX','TXT'):
 
@@ -190,9 +194,17 @@ def main():
                 if proxied.lower() in 'false':
                     proxied = 'N'
 
-            output += f'./cf-dns.sh -d {domain} -t {record_type} -n {name} -c {content}' + (f' -p {priority}' if record_type.upper() in 'MX' else '') + (f' -x {proxied}' if proxiable.lower() in 'true' else '') + f' -l {ttl} [-k] [-s] [-A]\n'
+#            if comment in 'none':
 
-            output += f'./cf-dns.sh -d {domain} -t {record_type} -n {name} -c {content} -Z [-a] [-k] [-s]\n\n'
+#            comment = comment.replace('None', '')
+            if comment:
+                comment = f'\'{comment}\''
+#            comment = f'\'{comment.replace("on", "")}\''
+#            comment = comment.replace("on", "")
+
+            output += f'./cf-dns.sh -d {domain} -t {record_type} -n {name} -c {content}' + (f' -p {priority}' if record_type.upper() in 'MX' else '') + (f' -x {proxied}' if proxiable.lower() in 'true' else '') + f' -l {ttl}' + (f' -C {comment}' if comment else '') + ' [-k] [-S] [-A]\n'
+
+            output += f'./cf-dns.sh -d {domain} -t {record_type} -n {name} -c {content} -Z [-a] [-k] [-S]\n\n'
 
             output += '* ' * 50 + '\n'
         
