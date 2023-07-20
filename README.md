@@ -78,7 +78,7 @@ In addition, please note the following:
 
 - A double `"` quote *contained* in a Comment [`-C COMMENT`] is replaced with a single `'` quote by the script to avoid the error `{"code":9207,"message":"Request body is invalid."}`. 
 
-- As Cloudflare only allows a maximum Comment [`-C COMMENT`] length of 100 characters, the script truncates them to 97 characters and prepends `...` .  
+- As Cloudflare only allows a maximum Comment [`-C COMMENT`] length of 100 characters, the script truncates them to 97 characters and appends `...` .  
 
 ## Authentication
 
@@ -314,7 +314,7 @@ To delete the **MX** record now pointing to **mail.example.net** use:
 
 <br />
 
-:point_right: As Cloudflare only allows comments upto a maximum of 100 characters, the script truncates comments longer than 97 characters and prepends them with `...`.
+:point_right: As Cloudflare only allows comments upto a maximum of 100 characters, the script truncates comments longer than 97 characters and appends `...`.
 
 ---
 
@@ -375,11 +375,11 @@ A DNS record to be deleted is only matched using the combined values of type (`-
 ### Usage
 `./get-dns.py -h/--help`
 
-`./get-dns.py -d/--domain DOMAIN [-k/--key] [-p/--pretty] [-r/--raw] [-S/--Screen]`
+`./get-dns.py -d/--domain DOMAIN [-k/--key] [-p/--pretty] [-r/--raw] [-s/--screen]`
 
 ### Example
 
-`./get-dns.py --domain=example.com --raw --Screen`
+`./get-dns.py --domain=example.com --raw --screen`
 
 ### Sample Output
 
