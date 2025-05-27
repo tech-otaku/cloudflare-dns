@@ -110,6 +110,8 @@ def main():
     try:
         #The domain's zone ID is stored in the 'id' key of the first [0] element of the 'result' key array (list). If the domain does not exist on your Cloudflare account, the JSON returned contains an empty 'result' key array and attempting to access the 'id' key will raise an 'IndexError' exception.
         zone_id = zone_info['result'][0]['id']
+        # As of 2024-11-30 the zone name is no longer included in each individual DNS record so we need to grab it here to use later in the script. See https://developers.cloudflare.com/fundamentals/api/reference/deprecations/#2024-11-30
+        zone_name = zone_info['result'][0]['name']  
     except IndexError as e:
         sys.exit(e)
 
@@ -152,16 +154,16 @@ def main():
             }
             modified_on
             name
-            priority      'MX' records only
+            priority        'MX' records only
             proxiable
             proxied
             ttl
             type
-            zone_id
-            zone_name
+            zone_id         Deprecated 2024-11-30. See https://developers.cloudflare.com/fundamentals/api/reference/deprecations/#2024-11-30
+            zone_name       Deprecated 2024-11-30. See https://developers.cloudflare.com/fundamentals/api/reference/deprecations/#2024-11-30
         """
 
-        domain = record['zone_name']
+        domain = zone_name
         record_type = record['type']
         name = record['name']
         content = record['content']

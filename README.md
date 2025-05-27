@@ -388,10 +388,22 @@ A DNS record to be deleted is only matched using the combined values of type (`-
 
 Record: 4/7 
 
-{"comment": "2nd 'MX' Record", "content": "aspmx.l.google.com", "created_on": "2020-09-17T11:18:19.583054Z", "id": "7bdb2e46037df332e5abdd45f8f981f5",
- "locked": false, "meta": {"auto_added": false, "managed_by_apps": false, "managed_by_argo_tunnel": false, "source": 
- "primary"}, "modified_on": "2020-09-17T11:18:19.583054Z", "name": "example.com", "priority": 5, "proxiable": false, 
- "proxied": false, "ttl": 3600, "type": "MX", "zone_id": "8b717207bcee4047af2e9dff95832996", "zone_name": "example.com"} 
+{
+    "comment": "2nd 'MX' Record",
+    "content": "aspmx.l.google.com",
+    "created_on": "2020-09-17T11:18:19.583054Z",
+    "id": "7bdb2e46037df332e5abdd45f8f981f5",
+    "meta": {},
+    "modified_on": "2020-09-17T11:18:19.583054Z",
+    "name": "example.com",
+    "priority": 5,
+    "proxiable": false,
+    "proxied": false,
+    "settings": {},
+    "tags": [],
+    "ttl": 3600,
+    "type": "MX"
+}
 
 Domain: example.com
 Type: MX
